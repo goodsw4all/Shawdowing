@@ -30,7 +30,10 @@ struct ContentView: View {
         } detail: {
             // Content View
             if let session = selectedSession {
-                ShadowingView(session: session)
+                ShadowingView(
+                    session: session,
+                    playerSettings: navigationVM.playerSettings
+                )
             } else {
                 VStack(spacing: 20) {
                     Image(systemName: "play.circle")

@@ -53,6 +53,42 @@ class TranscriptService {
         }
     }
     
+    /// YouTube 비디오 제목 가져오기
+    /// - Parameters:
+    ///   - videoID: YouTube Video ID
+    /// - Returns: 비디오 제목
+    func fetchVideoTitle(videoID: String) async throws -> String {
+        print("🎬 Fetching video title for: \(videoID)")
+        
+        guard let url = URL(string: "https://www.youtube.com/watch?v=\(videoID)") else {
+            throw TranscriptError.parsingError
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            
+            if let html = String(data: data, encoding: .utf8) {
+                // <title> 태그에서 제목 추출
+                if let titleRange = html.range(of: "<title>"),
+                   let titleEndRange = html.range(of: "</title>", range: titleRange.upperBound..<html.endIndex) {
+                    let title = String(html[titleRange.upperBound..<titleEndRange.lowerBound])
+                    // " - YouTube" 제거
+                    let cleanTitle = title.replacingOccurrences(of: " - YouTube", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    print("✅ Video title: \(cleanTitle)")
+                    return cleanTitle
+                }
+            }
+            
+            // 제목을 찾지 못한 경우
+            print("⚠️ Could not extract video title")
+            return "YouTube Video \(videoID)"
+            
+        } catch {
+            print("❌ Failed to fetch video title: \(error)")
+            throw TranscriptError.networkError(error)
+        }
+    }
+    
     /// YouTube Video ID로 자막 추출
     /// - Parameters:
     ///   - videoID: YouTube Video ID

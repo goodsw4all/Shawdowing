@@ -20,9 +20,7 @@ class ShadowingViewModel: ObservableObject {
     @Published var repeatCount: Int = 0
     @Published var isLooping: Bool = false  // 반복 중인지 표시
     
-    // YouTubePlayer Settings
-    @Published var playerSettings = PlayerSettings()
-    
+    private let playerSettings: PlayerSettings  // 전역 설정
     private var cancellables = Set<AnyCancellable>()
     private var timeObserverTask: Task<Void, Never>?
     private var loopTask: Task<Void, Never>?  // 반복 재생 Task
@@ -36,33 +34,33 @@ class ShadowingViewModel: ObservableObject {
         currentSentenceIndex >= session.sentences.count - 1
     }
     
-    init(session: ShadowingSession) {
+    init(session: ShadowingSession, playerSettings: PlayerSettings = PlayerSettings()) {
         self.session = session
+        self.playerSettings = playerSettings
         setupPlayer()
     }
     
     private func setupPlayer() {
         print("🎬 Setting up YouTube Player with Video ID: \(session.video.id)")
         
+        // Configuration - 기본 설정만 사용
+        // YouTubePlayerKit는 Configuration 초기화 시 playerVars를 직접 지원하지 않음
+        // 대신 기본 Configuration 사용
+        let configuration = YouTubePlayer.Configuration()
+        
         player = YouTubePlayer(
-            source: .video(id: session.video.id)
+            source: .video(id: session.video.id),
+            configuration: configuration
         )
         
-        print("⚙️ Player settings: autoPlay=\(playerSettings.autoPlay), quality=\(playerSettings.quality.displayName)")
+        print("⚙️ Player configured")
+        print("   - Video ID: \(session.video.id)")
+        print("   ⚠️  Note: YouTube pause overlay는 YouTube 정책상 제거 불가")
+        print("   ⚠️  controls, rel 등의 파라미터는 YouTubePlayerKit 제약으로 설정 제한됨")
         startTimeObserver()
     }
     
-    /// Player 재생성 (설정 변경 시)
-    func reloadPlayer() {
-        print("🔄 Reloading player with new settings...")
-        let currentIndex = currentSentenceIndex
-        
-        setupPlayer()
-        
-        // 현재 위치로 복귀
-        currentSentenceIndex = currentIndex
-        seekToCurrentSentence()
-    }
+    /// Player 재생성은 이제 필요 없음 (전역 설정 사용)
     
     private func startTimeObserver() {
         timeObserverTask?.cancel()
@@ -141,7 +139,19 @@ class ShadowingViewModel: ObservableObject {
     private func checkSentenceProgress(time: TimeInterval) {
         guard let sentence = currentSentence else { return }
         
-        // 0.5초 버퍼로 정확한 감지 (currentTimePublisher 업데이트 주기 고려)
+        // 1. 현재 재생 시간에 맞는 자막 인덱스 찾기 (동기화)
+        if let matchingIndex = session.sentences.firstIndex(where: { 
+            time >= $0.startTime && time < $0.endTime 
+        }) {
+            // 인덱스가 변경되었을 때만 업데이트
+            if matchingIndex != currentSentenceIndex {
+                print("🔄 Auto-updating sentence index: \(currentSentenceIndex) → \(matchingIndex) at \(time)s")
+                currentSentenceIndex = matchingIndex
+                repeatCount = 0
+            }
+        }
+        
+        // 2. 문장 끝에서 자동 일시정지
         let isNearEnd = time >= (sentence.endTime - 0.5) && time <= (sentence.endTime + 0.5)
         
         if isNearEnd && isPlaying {
@@ -263,6 +273,7 @@ class ShadowingViewModel: ObservableObject {
             
             // 데이터 영속성: 변경사항 저장
             saveSession()
+            objectWillChange.send()  // UI 업데이트 트리거
         }
     }
     
@@ -344,6 +355,7 @@ class ShadowingViewModel: ObservableObject {
             
             // 데이터 영속성: 변경사항 저장
             saveSession()
+            objectWillChange.send()  // UI 업데이트 트리거
         }
     }
     

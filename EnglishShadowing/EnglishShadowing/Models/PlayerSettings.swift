@@ -10,8 +10,9 @@ import Foundation
 struct PlayerSettings {
     var autoPlay: Bool = false
     var showCaptions: Bool = false
-    var showControls: Bool = true
-    var showFullscreenButton: Bool = true
+    var showControls: Bool = false  // 기본값 true로 복원 (YouTubePlayerKit 제약)
+    var showFullscreenButton: Bool = false
+    var showRelatedVideos: Bool = false  // rel=0 (같은 채널만)
     var loop: Bool = false
     
     // YouTube Player Quality 설정

@@ -34,71 +34,30 @@ class NavigationViewModel: ObservableObject {
     }
     
     init() {
-        Task {
-            await loadAllData()
-        }
+        // init에서는 Task 생성만, 실제 로드는 .task modifier에서
     }
     
-    private func createSampleDataIfNeeded() {
-        // 샘플 데이터가 없으면 생성
-        if activeSessions.isEmpty && history.isEmpty {
-            print("⚠️ No sessions found, creating sample data")
-            createSampleSessions()
-        } else {
-            print("✅ Loaded \(activeSessions.count) active sessions and \(history.count) history sessions")
-        }
-    }
-    
-    private func createSampleSessions() {
-        // Sample Video 1: Active Session
-        let video1 = YouTubeVideo(
-            id: "dQw4w9WgXcQ",
-            title: "Sample English Learning Video"
-        )
-        let sentences1 = [
-            SentenceItem(text: "Hello, welcome to this English learning session.", startTime: 0, endTime: 5),
-            SentenceItem(text: "Today we're going to practice shadowing.", startTime: 10, endTime: 15),
-            SentenceItem(text: "Repeat after me and improve your pronunciation.", startTime: 20, endTime: 25),
-        ]
-        var session1 = ShadowingSession(video: video1, sentences: sentences1, status: .active)
-        session1.completedSentences.insert(sentences1[0].id)
-        
-        activeSessions.append(session1)
-        
-        Task {
-            try? storageService.saveSession(session1)
-        }
-    }
+
     
     func loadAllData() async {
         do {
             print("📂 Loading all sessions...")
             let sessions = try storageService.loadAllSessions()
             
-            await MainActor.run {
-                self.activeSessions = sessions.filter { $0.status == .active }
-                self.history = sessions.filter { $0.status == .completed }
-            }
+            let activeList = sessions.filter { $0.status == .active }
+            let historyList = sessions.filter { $0.status == .completed }
+            
+            self.activeSessions = activeList
+            self.history = historyList
+            
+            print("✅ Loaded \(activeList.count) active + \(historyList.count) history sessions")
             
             self.playlists = try storageService.loadAllPlaylists()
-            
-            print("✅ Loaded \(activeSessions.count) active + \(history.count) history sessions")
-            
-            // 데이터 로드 후 샘플 데이터 필요한지 확인
-            await MainActor.run {
-                createSampleDataIfNeeded()
-            }
         } catch {
             print("❌ Failed to load data: \(error)")
-            // 데이터 로드 실패 시 초기화
-            await MainActor.run {
-                self.activeSessions = []
-                self.history = []
-                self.playlists = []
-                
-                // 샘플 데이터 생성
-                createSampleDataIfNeeded()
-            }
+            self.activeSessions = []
+            self.history = []
+            self.playlists = []
         }
     }
     
@@ -106,14 +65,17 @@ class NavigationViewModel: ObservableObject {
         let session = ShadowingSession(video: video, sentences: sentences, status: .active)
         activeSessions.append(session)
         
-        print("💾 Saving new session: \(session.video.title ?? session.video.id)")
+        print("💾 [createNewSession] Starting save for: \(session.video.title ?? session.video.id)")
+        print("💾 [createNewSession] Session ID: \(session.id)")
+        print("💾 [createNewSession] Sentences count: \(sentences.count)")
         
         Task {
             do {
                 try storageService.saveSession(session)
-                print("✅ Session saved successfully")
+                print("✅ [createNewSession] Session saved successfully")
             } catch {
-                print("❌ Failed to save session: \(error)")
+                print("❌ [createNewSession] Failed to save session: \(error)")
+                print("❌ [createNewSession] Error details: \(error.localizedDescription)")
             }
         }
     }

@@ -228,30 +228,44 @@ struct NewSessionView: View {
         print("🎬 Starting transcript extraction for video: \(videoID)")
         
         do {
-            // 1. TranscriptService로 자막 가져오기
+            // 1. 비디오 제목 가져오기 (비어있을 때만)
+            if videoTitle.isEmpty {
+                do {
+                    let title = try await TranscriptService.shared.fetchVideoTitle(videoID: videoID)
+                    await MainActor.run {
+                        videoTitle = title
+                    }
+                } catch {
+                    print("⚠️ Could not fetch video title: \(error)")
+                    // 제목 가져오기 실패해도 계속 진행
+                }
+            }
+            
+            // 2. TranscriptService로 자막 가져오기
             let sentences = try await TranscriptService.shared.fetchTranscript(videoID: videoID)
             
             guard !sentences.isEmpty else {
                 throw TranscriptService.TranscriptError.notAvailable
             }
             
-            // 2. 문장 병합 (짧은 자막들을 합침)
+            // 3. 문장 병합 (짧은 자막들을 합침)
             let merged = TranscriptService.shared.mergeSentences(sentences)
             
-            // 3. TextEditor에 표시 (UI 업데이트는 MainActor에서)
+            // 4. TextEditor에 표시 (UI 업데이트는 MainActor에서)
             await MainActor.run {
                 // 타이밍 정보 포함된 문장들 저장
                 extractedSentences = merged
                 
                 // 텍스트만 TextEditor에 표시
                 sentencesText = merged.map { $0.text }.joined(separator: "\n")
+                
                 isLoadingTranscript = false
                 
                 print("✅ Transcript extracted successfully: \(merged.count) sentences")
             }
             
         } catch let error as TranscriptService.TranscriptError {
-            // 4. 에러 처리
+            // 5. 에러 처리
             await MainActor.run {
                 transcriptError = error.userFriendlyMessage
                 isLoadingTranscript = false

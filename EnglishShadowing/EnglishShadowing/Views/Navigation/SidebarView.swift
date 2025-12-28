@@ -11,6 +11,7 @@ struct SidebarView: View {
     @EnvironmentObject var navigationVM: NavigationViewModel
     @Binding var selectedSession: ShadowingSession?
     @State private var showingNewSession = false
+    @State private var showingSettings = false  // Settings Sheet
     
     var body: some View {
         List(selection: $selectedSession) {
@@ -61,11 +62,24 @@ struct SidebarView: View {
             } header: {
                 Label("Playlists", systemImage: "folder.fill")
             }
+            
+            // Settings 섹션
+            Section {
+                Button {
+                    showingSettings = true
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+            }
         }
         .listStyle(.sidebar)
         .navigationTitle("Library")
         .sheet(isPresented: $showingNewSession) {
             NewSessionView()
+                .environmentObject(navigationVM)
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
                 .environmentObject(navigationVM)
         }
     }

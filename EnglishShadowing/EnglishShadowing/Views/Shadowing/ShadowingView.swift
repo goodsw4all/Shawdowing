@@ -9,12 +9,16 @@ import SwiftUI
 import YouTubePlayerKit
 
 struct ShadowingView: View {
+    @EnvironmentObject var navigationVM: NavigationViewModel
     @StateObject private var viewModel: ShadowingViewModel
     @State private var showFavoritesOnly: Bool = false
     @State private var hideCompleted: Bool = false
     
-    init(session: ShadowingSession) {
-        _viewModel = StateObject(wrappedValue: ShadowingViewModel(session: session))
+    init(session: ShadowingSession, playerSettings: PlayerSettings = PlayerSettings()) {
+        _viewModel = StateObject(wrappedValue: ShadowingViewModel(
+            session: session,
+            playerSettings: playerSettings
+        ))
     }
     
     // 필터링된 문장 리스트
