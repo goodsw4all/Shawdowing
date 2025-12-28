@@ -18,9 +18,14 @@ class ShadowingViewModel: ObservableObject {
     @Published var currentTime: TimeInterval = 0
     @Published var playbackRate: Double = 1.0
     @Published var repeatCount: Int = 0
+    @Published var isLooping: Bool = false  // 반복 중인지 표시
+    
+    // YouTubePlayer Settings
+    @Published var playerSettings = PlayerSettings()
     
     private var cancellables = Set<AnyCancellable>()
     private var timeObserverTask: Task<Void, Never>?
+    private var loopTask: Task<Void, Never>?  // 반복 재생 Task
     
     var currentSentence: SentenceItem? {
         guard currentSentenceIndex < session.sentences.count else { return nil }
@@ -38,11 +43,25 @@ class ShadowingViewModel: ObservableObject {
     
     private func setupPlayer() {
         print("🎬 Setting up YouTube Player with Video ID: \(session.video.id)")
+        
         player = YouTubePlayer(
             source: .video(id: session.video.id)
         )
         
+        print("⚙️ Player settings: autoPlay=\(playerSettings.autoPlay), quality=\(playerSettings.quality.displayName)")
         startTimeObserver()
+    }
+    
+    /// Player 재생성 (설정 변경 시)
+    func reloadPlayer() {
+        print("🔄 Reloading player with new settings...")
+        let currentIndex = currentSentenceIndex
+        
+        setupPlayer()
+        
+        // 현재 위치로 복귀
+        currentSentenceIndex = currentIndex
+        seekToCurrentSentence()
     }
     
     private func startTimeObserver() {
@@ -184,6 +203,32 @@ class ShadowingViewModel: ObservableObject {
         }
     }
     
+    /// 자막 클릭 시: seek + 자동 재생
+    func seekAndPlay() {
+        guard let sentence = currentSentence else { return }
+        print("🎬 Seek and play: \(sentence.text) at \(sentence.startTime)s")
+        
+        Task {
+            do {
+                // 1. Seek to start
+                try await player?.seek(
+                    to: .init(value: sentence.startTime, unit: .seconds),
+                    allowSeekAhead: true
+                )
+                print("⏭️ Seeked to: \(sentence.startTime)s")
+                
+                // 2. Start playing
+                try await player?.play()
+                await MainActor.run {
+                    self.isPlaying = true
+                }
+                print("▶️ Auto-playing")
+            } catch {
+                print("❌ Seek and play failed: \(error)")
+            }
+        }
+    }
+    
     func nextSentence() {
         if currentSentenceIndex < session.sentences.count - 1 {
             currentSentenceIndex += 1
@@ -215,14 +260,33 @@ class ShadowingViewModel: ObservableObject {
         if let index = session.sentences.firstIndex(where: { $0.id == sentence.id }) {
             session.sentences[index].isFavorite.toggle()
             print("⭐️ Favorite toggled: \(session.sentences[index].isFavorite)")
+            
+            // 데이터 영속성: 변경사항 저장
+            saveSession()
         }
     }
     
     func loopCurrentSentence(times: Int) {
         guard let sentence = currentSentence else { return }
         
-        Task {
+        // 기존 반복 취소
+        cancelLoop()
+        
+        isLooping = true
+        loopTask = Task {
+            defer { 
+                Task { @MainActor in
+                    self.isLooping = false
+                }
+            }
+            
             for i in 0..<times {
+                // Task 취소 확인
+                if Task.isCancelled {
+                    print("⏹️ Loop cancelled")
+                    return
+                }
+                
                 print("🔁 Loop \(i + 1)/\(times)")
                 
                 // Seek to start
@@ -233,15 +297,25 @@ class ShadowingViewModel: ObservableObject {
                 
                 // Play
                 try? await player?.play()
-                self.isPlaying = true
+                await MainActor.run {
+                    self.isPlaying = true
+                }
                 
                 // Wait for sentence duration
                 let duration = sentence.duration
                 try? await Task.sleep(for: .seconds(duration))
                 
+                // Task 취소 확인
+                if Task.isCancelled {
+                    print("⏹️ Loop cancelled during playback")
+                    return
+                }
+                
                 // Pause at end
                 try? await player?.pause()
-                self.isPlaying = false
+                await MainActor.run {
+                    self.isPlaying = false
+                }
                 
                 // Wait 1 second before next loop
                 if i < times - 1 {
@@ -253,22 +327,49 @@ class ShadowingViewModel: ObservableObject {
         }
     }
     
+    func cancelLoop() {
+        loopTask?.cancel()
+        loopTask = nil
+        isLooping = false
+        print("🛑 Loop task cancelled")
+    }
+    
     func markCurrentSentenceCompleted() {
         guard let sentence = currentSentence else { return }
         session.completedSentences.insert(sentence.id)
         
         if let index = session.sentences.firstIndex(where: { $0.id == sentence.id }) {
             session.sentences[index].isCompleted = true
+            print("✅ Sentence marked as completed")
+            
+            // 데이터 영속성: 변경사항 저장
+            saveSession()
         }
     }
     
     func setPlaybackRate(_ rate: Double) {
         playbackRate = rate
-        // YouTubePlayerKit playback rate는 플레이어 UI에서 직접 제어
-        // 추후 필요시 구현
+        print("🎚️ Playback rate updated to \(rate)x (UI only)")
+        
+        // TODO: YouTubePlayerKit doesn't support setPlaybackRate directly
+        // User must use YouTube player's built-in speed control
+        // Future: Investigate YouTube iframe API postMessage
+    }
+    
+    // 데이터 저장 헬퍼 함수
+    private func saveSession() {
+        Task {
+            do {
+                try StorageService.shared.saveSession(session)
+                print("💾 Session saved successfully")
+            } catch {
+                print("❌ Failed to save session: \(error)")
+            }
+        }
     }
     
     deinit {
         timeObserverTask?.cancel()
+        loopTask?.cancel()
     }
 }

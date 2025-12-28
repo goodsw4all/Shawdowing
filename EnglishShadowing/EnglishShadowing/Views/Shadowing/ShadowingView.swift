@@ -10,31 +10,69 @@ import YouTubePlayerKit
 
 struct ShadowingView: View {
     @StateObject private var viewModel: ShadowingViewModel
+    @State private var showFavoritesOnly: Bool = false
+    @State private var hideCompleted: Bool = false
+    @State private var showPlayerSettings: Bool = false  // Settings Sheet
     
     init(session: ShadowingSession) {
         _viewModel = StateObject(wrappedValue: ShadowingViewModel(session: session))
     }
     
+    // 필터링된 문장 리스트
+    private var filteredSentences: [(index: Int, sentence: SentenceItem)] {
+        let indexed = Array(viewModel.session.sentences.enumerated())
+        
+        return indexed.compactMap { (offset, element) -> (index: Int, sentence: SentenceItem)? in
+            // 즐겨찾기 필터
+            if showFavoritesOnly && !element.isFavorite {
+                return nil
+            }
+            
+            // 완료된 문장 숨기기 필터
+            if hideCompleted && element.isCompleted {
+                return nil
+            }
+            
+            return (index: offset, sentence: element)
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
-            // YouTube Player
-            if let player = viewModel.player {
-                YouTubePlayerView(player)
-                    .frame(height: 450)
-                    .cornerRadius(12)
-                    .padding()
-                    .onAppear {
-                        print("📱 YouTubePlayerView appeared")
-                        print("📹 Video source: \(player.source)")
+            // YouTube Player with Settings Button
+            ZStack(alignment: .topTrailing) {
+                if let player = viewModel.player {
+                    YouTubePlayerView(player)
+                        .frame(height: 450)
+                        .cornerRadius(12)
+                        .onAppear {
+                            print("📱 YouTubePlayerView appeared")
+                            print("📹 Video source: \(player.source)")
+                        }
+                } else {
+                    VStack {
+                        ProgressView()
+                        Text("Loading player...")
+                            .foregroundStyle(.secondary)
                     }
-            } else {
-                VStack {
-                    ProgressView()
-                    Text("Loading player...")
-                        .foregroundStyle(.secondary)
+                    .frame(height: 450)
                 }
-                .frame(height: 450)
+                
+                // Settings Button (Overlay)
+                Button {
+                    showPlayerSettings = true
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.title3)
+                        .foregroundStyle(.white)
+                        .padding(10)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .padding()
             }
+            .padding()
             
             // Current Sentence Card
             if let sentence = viewModel.currentSentence {
@@ -54,50 +92,95 @@ struct ShadowingView: View {
                     
                     Spacer()
                     
+                    // 필터 상태 표시
+                    if showFavoritesOnly || hideCompleted {
+                        Text("\(filteredSentences.count)/\(viewModel.session.sentences.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
                     // Filter buttons
                     Button {
-                        // Show all
+                        showFavoritesOnly = false
+                        hideCompleted = false
                     } label: {
                         Text("전체")
                             .font(.caption)
                     }
                     .buttonStyle(.bordered)
+                    .tint(!showFavoritesOnly && !hideCompleted ? .blue : .gray)
                     
                     Button {
-                        // Show favorites only
+                        showFavoritesOnly.toggle()
                     } label: {
-                        Image(systemName: "star.fill")
+                        Image(systemName: showFavoritesOnly ? "star.fill" : "star")
                             .font(.caption)
                     }
                     .buttonStyle(.bordered)
+                    .tint(showFavoritesOnly ? .yellow : .gray)
+                    
+                    Button {
+                        hideCompleted.toggle()
+                    } label: {
+                        Image(systemName: hideCompleted ? "eye.slash.fill" : "eye.slash")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(hideCompleted ? .green : .gray)
                 }
                 .padding(.horizontal)
                 
                 ScrollViewReader { proxy in
-                    List(Array(viewModel.session.sentences.enumerated()), id: \.element.id) { index, sentence in
-                        SentenceRow(
-                            sentence: sentence,
-                            isCurrentlyPlaying: index == viewModel.currentSentenceIndex,
-                            onTap: {
-                                viewModel.currentSentenceIndex = index
-                                viewModel.seekToCurrentSentence()
-                            },
-                            onFavorite: {
-                                viewModel.currentSentenceIndex = index
-                                viewModel.toggleFavoriteSentence()
-                            },
-                            onLoop: {
-                                viewModel.currentSentenceIndex = index
-                                viewModel.loopCurrentSentence(times: 3)
+                    if filteredSentences.isEmpty {
+                        // 빈 상태 메시지
+                        VStack(spacing: 12) {
+                            Image(systemName: "tray")
+                                .font(.system(size: 48))
+                                .foregroundStyle(.secondary)
+                            
+                            Text("필터 조건에 맞는 문장이 없습니다")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                            
+                            if showFavoritesOnly {
+                                Text("⭐️를 눌러 문장을 즐겨찾기에 추가하세요")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
-                        )
-                    }
-                    .listStyle(.plain)
-                    .frame(maxHeight: 250)
-                    .onChange(of: viewModel.currentSentenceIndex) { _, newIndex in
-                        if newIndex < viewModel.session.sentences.count {
-                            withAnimation {
-                                proxy.scrollTo(viewModel.session.sentences[newIndex].id, anchor: .center)
+                            
+                            Button("필터 초기화") {
+                                showFavoritesOnly = false
+                                hideCompleted = false
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: 250)
+                    } else {
+                        List(filteredSentences, id: \.sentence.id) { item in
+                            SentenceRow(
+                                sentence: item.sentence,
+                                isCurrentlyPlaying: item.index == viewModel.currentSentenceIndex,
+                                onTap: {
+                                    viewModel.currentSentenceIndex = item.index
+                                    viewModel.seekAndPlay()  // seek + 자동 재생
+                                },
+                                onFavorite: {
+                                    viewModel.currentSentenceIndex = item.index
+                                    viewModel.toggleFavoriteSentence()
+                                },
+                                onLoop: {
+                                    viewModel.currentSentenceIndex = item.index
+                                    viewModel.loopCurrentSentence(times: 3)
+                                }
+                            )
+                        }
+                        .listStyle(.plain)
+                        .frame(maxHeight: 250)
+                        .onChange(of: viewModel.currentSentenceIndex) { _, newIndex in
+                            if newIndex < viewModel.session.sentences.count {
+                                withAnimation {
+                                    proxy.scrollTo(viewModel.session.sentences[newIndex].id, anchor: .center)
+                                }
                             }
                         }
                     }
@@ -110,6 +193,11 @@ struct ShadowingView: View {
         }
         .navigationTitle(viewModel.session.video.title ?? "Shadowing")
         .navigationSubtitle("\(viewModel.currentSentenceIndex + 1) / \(viewModel.session.sentences.count)")
+        .sheet(isPresented: $showPlayerSettings) {
+            PlayerSettingsSheet(settings: $viewModel.playerSettings) {
+                viewModel.reloadPlayer()
+            }
+        }
     }
 }
 
@@ -218,9 +306,7 @@ struct SentenceRow: View {
             // Loop button with menu
             Menu {
                 Button("1회 반복") { 
-                    if let index = sentence.id as? Int {
-                        // Loop 1 time
-                    }
+                    // Loop 1 time - handled by onLoop
                 }
                 Button("3회 반복") { 
                     // Loop 3 times
@@ -274,24 +360,36 @@ struct ControlPanelView: View {
                 Divider()
                     .frame(height: 30)
                 
-                // Loop menu
-                Menu {
-                    Button("1회 반복") {
-                        viewModel.loopCurrentSentence(times: 1)
+                // Loop menu or Cancel button
+                if viewModel.isLooping {
+                    Button(action: viewModel.cancelLoop) {
+                        HStack {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("중지")
+                        }
                     }
-                    Button("3회 반복") {
-                        viewModel.loopCurrentSentence(times: 3)
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                } else {
+                    Menu {
+                        Button("1회 반복") {
+                            viewModel.loopCurrentSentence(times: 1)
+                        }
+                        Button("3회 반복") {
+                            viewModel.loopCurrentSentence(times: 3)
+                        }
+                        Button("5회 반복") {
+                            viewModel.loopCurrentSentence(times: 5)
+                        }
+                        Button("10회 반복") {
+                            viewModel.loopCurrentSentence(times: 10)
+                        }
+                    } label: {
+                        Label("반복", systemImage: "repeat")
                     }
-                    Button("5회 반복") {
-                        viewModel.loopCurrentSentence(times: 5)
-                    }
-                    Button("10회 반복") {
-                        viewModel.loopCurrentSentence(times: 10)
-                    }
-                } label: {
-                    Label("반복", systemImage: "repeat")
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
                 
                 Button(action: viewModel.toggleFavoriteSentence) {
                     Label("저장", systemImage: viewModel.currentSentence?.isFavorite == true ? "star.fill" : "star")

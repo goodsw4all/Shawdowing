@@ -33,14 +33,18 @@ class NavigationViewModel: ObservableObject {
     }
     
     init() {
-        loadAllData()
-        createSampleDataIfNeeded()
+        Task {
+            await loadAllData()
+        }
     }
     
     private func createSampleDataIfNeeded() {
         // 샘플 데이터가 없으면 생성
         if activeSessions.isEmpty && history.isEmpty {
+            print("⚠️ No sessions found, creating sample data")
             createSampleSessions()
+        } else {
+            print("✅ Loaded \(activeSessions.count) active sessions and \(history.count) history sessions")
         }
     }
     
@@ -65,24 +69,34 @@ class NavigationViewModel: ObservableObject {
         }
     }
     
-    func loadAllData() {
-        Task {
-            do {
-                let sessions = try storageService.loadAllSessions()
-                
+    func loadAllData() async {
+        do {
+            print("📂 Loading all sessions...")
+            let sessions = try storageService.loadAllSessions()
+            
+            await MainActor.run {
                 self.activeSessions = sessions.filter { $0.status == .active }
                 self.history = sessions.filter { $0.status == .completed }
-                
-                self.playlists = try storageService.loadAllPlaylists()
-            } catch {
-                print("Failed to load data: \(error)")
-                // 데이터 로드 실패 시 초기화
+            }
+            
+            self.playlists = try storageService.loadAllPlaylists()
+            
+            print("✅ Loaded \(activeSessions.count) active + \(history.count) history sessions")
+            
+            // 데이터 로드 후 샘플 데이터 필요한지 확인
+            await MainActor.run {
+                createSampleDataIfNeeded()
+            }
+        } catch {
+            print("❌ Failed to load data: \(error)")
+            // 데이터 로드 실패 시 초기화
+            await MainActor.run {
                 self.activeSessions = []
                 self.history = []
                 self.playlists = []
                 
                 // 샘플 데이터 생성
-                createSampleSessions()
+                createSampleDataIfNeeded()
             }
         }
     }
@@ -91,8 +105,15 @@ class NavigationViewModel: ObservableObject {
         let session = ShadowingSession(video: video, sentences: sentences, status: .active)
         activeSessions.append(session)
         
+        print("💾 Saving new session: \(session.video.title ?? session.video.id)")
+        
         Task {
-            try? storageService.saveSession(session)
+            do {
+                try storageService.saveSession(session)
+                print("✅ Session saved successfully")
+            } catch {
+                print("❌ Failed to save session: \(error)")
+            }
         }
     }
     

@@ -50,8 +50,10 @@ mindmap
 | 🎬 **YouTube 스트리밍** | YouTubePlayerKit으로 직접 재생 | 빠른 시작 |
 | 🤖 **자막 자동 추출** | swift-youtube-transcript로 자동 가져오기 | 편리함 |
 | 📝 **수동 입력 지원** | 자막 없는 영상도 학습 가능 | 유연성 |
-| 🔄 **문장 반복** | 각 문장 3회 자동 반복 | 효율적 암기 |
+| 🔄 **다중 반복 재생** | 1/3/5/10회 선택 가능한 구간 반복 | 효율적 학습 |
 | ⏸️ **자동 일시정지** | 문장 끝에서 자동 멈춤 | 따라 말할 시간 |
+| ⭐️ **즐겨찾기** | 중요한 문장 저장 및 복습 | 맞춤 학습 |
+| 📍 **클릭 이동** | 자막 클릭 시 해당 시간으로 즉시 이동 | 빠른 탐색 |
 | 🎤 **녹음 비교** | 원본 vs 녹음본 재생 | 발음 개선 |
 | 🎚️ **속도 조절** | 0.5x ~ 2.0x 재생 속도 | 단계별 학습 |
 | ✅ **App Store 안전** | 외부 바이너리 불필요 | 정책 준수 |
@@ -602,37 +604,143 @@ class YouTubePlayerService: ObservableObject {
 - 파스텔 톤으로 눈의 피로도 감소
 
 ### Phase 5: Shadowing Features
-**목표**: 쉐도잉 학습에 특화된 기능 구현
+**목표**: 쉐도잉 학습에 특화된 기능 구현 ✅ **구현 완료**
 
-#### 쉐도잉 모드
-1.  **문장 단위 재생**:
-    -   한 문장 재생 후 자동 일시정지
-    -   사용자가 따라 말할 시간 제공 (3초)
-    -   다음 문장 자동 재생
+#### 5.1 자막 시간별 리스트
+```swift
+// 시간 순서대로 정렬된 자막 리스트
+ScrollViewReader { proxy in
+    List(sentences) { sentence in
+        SentenceRow(
+            sentence: sentence,
+            isCurrentlyPlaying: index == currentIndex,
+            onTap: { seekToSentence() }  // 클릭 시 이동
+        )
+    }
+}
+```
 
-2.  **반복 학습**:
-    -   같은 문장 N회 반복 (기본 3회)
-    -   반복 횟수 커스터마이징
+**특징**:
+- ✅ 타임스탬프 표시 (00:00 - 00:05)
+- ✅ 현재 재생 중인 자막 하이라이트 (파란색 배경)
+- ✅ 자동 스크롤 (재생 중인 자막으로)
+- ✅ 클릭 시 해당 시간으로 즉시 이동
 
-3.  **속도 조절**:
-    -   느린 속도로 시작 (0.75x)
-    -   점진적으로 속도 증가
-    -   정상 속도(1.0x) 도달
+#### 5.2 다중 반복 재생
+```swift
+func loopCurrentSentence(times: Int) {
+    Task {
+        for i in 0..<times {
+            // 시작 지점으로 seek
+            try? await player?.seek(to: startTime)
+            // 재생
+            try? await player?.play()
+            // 문장 길이만큼 대기
+            try? await Task.sleep(for: .seconds(duration))
+            // 일시정지
+            try? await player?.pause()
+            // 1초 대기 후 다음 반복
+        }
+    }
+}
+```
 
-#### 녹음 및 비교
+**사용 방법**:
+- **컨트롤 패널**: "반복" 버튼 → 1/3/5/10회 선택
+- **자막 리스트**: 각 자막 옆 🔁 아이콘 클릭
+
+**반복 플로우**:
+```mermaid
+sequenceDiagram
+    participant User
+    participant VM as ViewModel
+    participant Player as YouTubePlayer
+    
+    User->>VM: "3회 반복" 선택
+    loop 3번 반복
+        VM->>Player: seek(startTime)
+        VM->>Player: play()
+        Note over VM: 문장 길이만큼 대기
+        VM->>Player: pause()
+        Note over VM: 1초 대기
+    end
+    VM->>User: 반복 완료 ✅
+```
+
+#### 5.3 즐겨찾기 시스템
+```swift
+struct SentenceItem {
+    var isFavorite: Bool = false  // ⭐️ 즐겨찾기
+    var notes: String = ""        // 메모 (향후 확장)
+}
+
+func toggleFavoriteSentence() {
+    session.sentences[index].isFavorite.toggle()
+}
+```
+
+**Sidebar 즐겨찾기 섹션**:
+```
+📚 Library
+├─ ✅ Active Sessions
+├─ ⭐️ Favorites       ← 새로 추가
+│  ├─ "Hello, welcome..." (Video 1)
+│  ├─ "This is amazing!" (Video 2)
+│  └─ "Let's practice." (Video 3)
+├─ ✅ History
+└─ 📂 Playlists
+```
+
+**기능**:
+- ⭐️ 중요한 문장 저장
+- 🔍 Sidebar에서 빠른 접근
+- 📍 클릭 시 원본 세션으로 이동
+- 🎯 맞춤형 복습 리스트
+
+#### 5.4 문장 단위 재생
+1.  **자동 일시정지**:
+    -   문장 끝에서 자동 멈춤 (±0.5초 버퍼)
+    -   사용자가 따라 말할 시간 제공
+    -   다음 문장 수동/자동 선택
+
+2.  **속도 조절**:
+    -   0.5x ~ 2.0x 재생 속도
+    -   실시간 속도 변경 (UI에서 클릭)
+    -   느린 속도로 시작 → 점진적 증가 학습법
+
+#### 5.5 녹음 및 비교 (미구현)
 -   **녹음**: 문장별로 사용자 음성 녹음
 -   **재생**: 원본 → 녹음본 순차 재생
 -   **저장**: 녹음 파일 로컬 저장 (`~/Documents/Shadowing/`)
+
+#### 5.6 구현된 UI 컴포넌트
+
+**SentenceRow (자막 행)**:
+```
+[⭐️] [✓] Hello, welcome to this video.  [🔁]
+         00:00 - 00:05 ⭐️
+```
+- ⭐️ 즐겨찾기 버튼 (클릭 토글)
+- ✓ 완료 표시
+- 🔁 반복 메뉴 (1/3/5/10회)
+- 📍 현재 재생 표시 (파란색 배경 + 파형 아이콘)
+
+**ControlPanelView**:
+```
+[◀◀] [▶/⏸] [▶▶] | [반복 ▼] [⭐️ 저장] [✓ 완료]
+                   속도: 0.5x 0.75x [1.0x] 1.25x 1.5x 2.0x
+```
 
 ### Phase 6: UI/UX Polish & Features
 **목표**: macOS 네이티브 경험 제공 및 추가 기능
 
 #### 6.1 Sidebar 추가 기능
--   **드래그 앤 드롭**: 세션을 플레이리스트로 이동
--   **컨텍스트 메뉴**: 우클릭으로 편집/삭제/복제
--   **검색**: Command+F로 세션 검색
--   **정렬**: 이름/날짜/진도 순 정렬
--   **필터**: 완료/진행 중/임시 저장 필터링
+-   ✅ **즐겨찾기 섹션**: 저장된 문장 빠른 접근
+-   **드래그 앤 드롭**: 세션을 플레이리스트로 이동 (미구현)
+-   **컨텍스트 메뉴**: 우클릭으로 편집/삭제/복제 (미구현)
+-   **검색**: Command+F로 세션 검색 (미구현)
+-   **정렬**: 이름/날짜/진도 순 정렬 (미구현)
+-   **필터**: 완료/진행 중/즐겨찾기 필터링 (부분 구현)
 
 #### 6.2 macOS 최적화
 -   **메뉴바 지원**: 파일 열기, 설정, 도움말
@@ -690,25 +798,29 @@ flowchart TD
     style Preview fill:#FFE4B5
 ```
 
-### 3.2 Shadowing Workflow
+### 3.2 Shadowing Workflow (Updated)
 
 ```mermaid
 stateDiagram-v2
     [*] --> Idle: 쉐도잉 모드 활성화
     
-    Idle --> PlayingSentence: 문장 재생 시작
-    PlayingSentence --> Paused: 문장 종료
+    Idle --> SelectSentence: 자막 클릭 또는 자동
+    SelectSentence --> PlayingSentence: 문장 재생 시작
+    PlayingSentence --> Paused: 문장 종료 (자동 일시정지)
     
+    Paused --> LoopSentence: 반복 버튼 클릭 (1/3/5/10회)
     Paused --> Recording: 녹음 버튼 클릭
-    Paused --> NextSentence: 녹음 스킵
+    Paused --> NextSentence: 다음 문장
+    Paused --> FavoriteSentence: 즐겨찾기 저장
     
-    Recording --> RecordingDone: 녹음 완료
+    LoopSentence --> PlayingSentence: 자동 반복 재생
+    
+    FavoriteSentence --> Paused: 저장 완료
+    
+    Recording --> RecordingDone: 녹음 완료 (미구현)
     RecordingDone --> PlaybackOriginal: 원본 재생
     PlaybackOriginal --> PlaybackRecorded: 녹음본 재생
-    PlaybackRecorded --> CheckRepeat: 반복 횟수 확인
-    
-    CheckRepeat --> PlayingSentence: 반복 < 3회
-    CheckRepeat --> NextSentence: 반복 = 3회
+    PlaybackRecorded --> Paused: 비교 완료
     
     NextSentence --> PlayingSentence: 다음 문장 존재
     NextSentence --> Complete: 마지막 문장
@@ -718,15 +830,47 @@ stateDiagram-v2
     note right of PlayingSentence
         재생 속도 조절 가능
         0.5x ~ 2.0x
+        클릭으로 즉시 이동
     end note
     
-    note right of Recording
-        최대 10초
-        자동 중지
+    note right of LoopSentence
+        1/3/5/10회 선택
+        자동 반복 실행
+    end note
+    
+    note right of FavoriteSentence
+        ⭐️ Sidebar에 저장
+        나중에 빠른 복습
     end note
 ```
 
-### 3.3 Keyboard Shortcuts (macOS Standard)
+### 3.3 Favorite Sentence Flow (새 기능)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant ShadowingView
+    participant ViewModel
+    participant SentenceItem
+    participant Sidebar
+    
+    User->>ShadowingView: ⭐️ 즐겨찾기 클릭
+    ShadowingView->>ViewModel: toggleFavoriteSentence()
+    ViewModel->>SentenceItem: isFavorite = true
+    ViewModel->>StorageService: saveSession()
+    StorageService-->>Sidebar: 데이터 업데이트
+    Sidebar->>User: ⭐️ Favorites 섹션에 표시
+    
+    Note over User,Sidebar: 나중에 복습 시
+    
+    User->>Sidebar: Favorites 섹션 클릭
+    Sidebar->>ShadowingView: 세션 & 문장 선택
+    ShadowingView->>ViewModel: seekToSentence()
+    ViewModel->>YouTubePlayer: seek(startTime)
+    YouTubePlayer-->>User: 해당 문장으로 이동 ✅
+```
+
+### 3.4 Keyboard Shortcuts (macOS Standard)
 | 단축키 | 기능 | 카테고리 |
 |--------|------|----------|
 | `Cmd+N` | 새 세션 만들기 | Navigation |
@@ -1004,34 +1148,37 @@ EnglishShadowing-macOS/
 │   │   └── EnglishShadowingApp.swift
 │   ├── Views/
 │   │   ├── Navigation/
-│   │   │   ├── SidebarView.swift            // 3-column Sidebar
+│   │   │   ├── SidebarView.swift            // 3-column Sidebar + Favorites
 │   │   │   ├── SessionListView.swift        // Active/Drafts/History
+│   │   │   ├── FavoriteSentenceRow.swift    // 즐겨찾기 자막 행 ✨
 │   │   │   └── PlaylistListView.swift       // Playlist 관리
 │   │   ├── Session/
 │   │   │   ├── SessionDetailView.swift      // Detail View (중간)
 │   │   │   ├── NewSessionView.swift         // 새 세션 생성
 │   │   │   └── SessionEditView.swift        // 세션 편집
 │   │   ├── Shadowing/
-│   │   │   ├── ShadowingView.swift          // Content View (메인)
-│   │   │   ├── YouTubePlayerView.swift      // YouTubePlayer 래퍼
+│   │   │   ├── ShadowingView.swift          // Content View (메인) ✨
+│   │   │   ├── SentenceRow.swift            // 개선된 자막 행 ✨
 │   │   │   ├── CurrentSentenceCard.swift    // 현재 문장 표시
-│   │   │   └── ControlPanelView.swift       // 재생 컨트롤
+│   │   │   └── ControlPanelView.swift       // 재생 컨트롤 + 반복/즐겨찾기 ✨
 │   │   └── Components/
 │   │       ├── SentenceListView.swift       // 문장 리스트
 │   │       ├── TimingEditorView.swift       // 타이밍 수동 설정
 │   │       └── ProgressIndicator.swift      // 진도 표시
 │   ├── ViewModels/
-│   │   └── ShadowingViewModel.swift     // 통합 ViewModel
+│   │   ├── NavigationViewModel.swift       // favoriteSentences 추가 ✨
+│   │   └── ShadowingViewModel.swift        // 반복/즐겨찾기 로직 추가 ✨
 │   ├── Services/
-│   │   ├── YouTubePlayerService.swift   // YouTubePlayerKit 관리
-│   │   ├── TranscriptService.swift      // 자막 추출 (swift-youtube-transcript)
-│   │   ├── RecordingService.swift       // 음성 녹음
-│   │   ├── TimingService.swift          // 타이밍 계산
-│   │   └── PersistenceService.swift     // 데이터 저장
+│   │   ├── YouTubePlayerService.swift      // YouTubePlayerKit 관리
+│   │   ├── TranscriptService.swift         // 자막 추출 (swift-youtube-transcript)
+│   │   ├── RecordingService.swift          // 음성 녹음 (미구현)
+│   │   ├── TimingService.swift             // 타이밍 계산
+│   │   └── StorageService.swift            // 데이터 저장
 │   ├── Models/
 │   │   ├── YouTubeVideo.swift
-│   │   ├── SentenceItem.swift
-│   │   └── ShadowingSession.swift
+│   │   ├── SentenceItem.swift              // isFavorite, notes 필드 추가 ✨
+│   │   ├── ShadowingSession.swift
+│   │   └── Playlist.swift
 │   ├── Utilities/
 │   │   ├── VideoIDExtractor.swift       // URL 파싱
 │   │   └── TimeFormatter.swift          // 시간 포맷팅
@@ -1181,23 +1328,82 @@ graph TB
 
 ## 11. Future Enhancements (향후 개선사항)
 
-### Phase 2 Features
--   **학습 기록 및 통계**: 일일 학습 시간, 완료한 문장 수
--   **단어장 기능**: 어려운 단어 저장 및 복습
+### Phase 2 Features (다음 단계)
+-   **자막 필터링**: 즐겨찾기만 표시, 완료된 문장 숨기기
+-   **자막 검색**: 텍스트 기반 검색 기능
+-   **AB 구간 반복**: 시작~끝 지점 사용자 설정
+-   **반복 간격 조절**: 반복 사이 대기 시간 커스터마이징
+-   **문장 메모**: 각 문장에 개인 메모 추가
+-   **학습 통계**: 반복 횟수, 학습 시간 추적
+
+### Phase 3 Features (고급)
+-   **학습 기록 대시보드**: 일일/주간/월간 통계
+-   **단어장 기능**: 어려운 단어 자동 추출 및 복습
 -   **AI 발음 분석**: Speech Recognition으로 정확도 측정
 -   **iCloud 동기화**: 여러 Mac에서 학습 진도 공유
 -   **다국어 자막 지원**: 영어 외 다른 언어 자막 추출
 
-### Advanced Features
+### Advanced Features (장기)
 -   **자막 품질 개선**: 문장 병합 알고리즘 고도화
 -   **Playlist 지원**: 여러 영상을 순차적으로 학습
 -   **학습 목표 설정**: 일일/주간 목표 설정 및 알림
 -   **iOS/iPadOS 확장**: iPhone, iPad 버전 개발
 -   **커스텀 자막 편집**: 타이밍 및 텍스트 수정 기능
+-   **자동 진행 모드**: 모든 문장 순차 반복 (자동 학습)
 
 ---
 
-**문서 버전**: 3.0.0  
+## 12. 부록 (Appendix)
+
+### 12.1 Shadowing 기능 구현 세부사항
+
+**Phase 5**에서 구현된 Shadowing 기능들의 상세 내역은 아래와 같습니다:
+
+#### ✅ 구현된 기능
+1. **자막 시간별 리스트**: 타임스탬프 + 현재 재생 하이라이트
+2. **자막 클릭 이동**: 즉시 seek + 자동 스크롤
+3. **다중 반복 재생**: 1/3/5/10회 자동 반복
+4. **즐겨찾기**: Sidebar Favorites 섹션 + 빠른 복습
+
+#### 📊 기능 비교
+| 항목 | 이전 | 현재 |
+|------|------|------|
+| 반복 재생 | 1회만 | 1/3/5/10회 선택 |
+| 즐겨찾기 | ❌ | ⭐️ Sidebar 표시 |
+| 자동 스크롤 | ❌ | ✅ |
+
+**상세 문서**: `.archive/SHADOWING_FEATURES.md.backup` (백업 보관)
+
+---
+
+### 12.2 자막 추출 기술 조사
+
+YouTube 자막 추출을 위해 **swift-youtube-transcript**를 채택했습니다.
+
+#### 선택 이유
+- ✅ Swift 네이티브 (SPM)
+- ✅ 무료 & 오픈소스
+- ✅ App Store 정책 준수
+- ✅ async/await 지원
+
+#### 대안 비교
+| 방법 | 장점 | 단점 | 채택 |
+|------|------|------|------|
+| swift-youtube-transcript | 간단, 무료 | 비공식 API | ✅ |
+| REST API (유료) | 안정적 | 비용 발생 | ❌ |
+| YouTube Data API v3 | 공식 | 본인 영상만 | ❌ |
+
+**상세 조사**: `.archive/SUBTITLE_EXTRACTION_RESEARCH.md.backup` (백업 보관)
+
+---
+
+**문서 버전**: 3.2.0  
 **작성일**: 2025-12-28  
-**최종 수정**: 2025-12-28 (swift-youtube-transcript 추가)  
+**최종 수정**: 2025-12-28  
+**주요 업데이트**: 
+- swift-youtube-transcript 자막 자동 추출
+- 다중 반복 재생 기능 (1/3/5/10회)
+- 즐겨찾기 시스템 (Sidebar Favorites)
+- 자막 클릭 이동 및 자동 스크롤
+- 문서 통합 (SHADOWING_FEATURES, SUBTITLE_EXTRACTION_RESEARCH → 부록)
 **목적**: macOS 전용 YouTube 쉐도잉 학습 도구 개발
