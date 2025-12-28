@@ -13,6 +13,7 @@ class NavigationViewModel: ObservableObject {
     @Published var activeSessions: [ShadowingSession] = []
     @Published var history: [ShadowingSession] = []
     @Published var playlists: [Playlist] = []
+    @Published var playerSettings = PlayerSettings()  // 전역 플레이어 설정
     
     private let storageService = StorageService.shared
     private var cancellables = Set<AnyCancellable>()

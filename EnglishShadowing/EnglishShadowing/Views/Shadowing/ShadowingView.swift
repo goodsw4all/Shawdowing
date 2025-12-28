@@ -12,7 +12,6 @@ struct ShadowingView: View {
     @StateObject private var viewModel: ShadowingViewModel
     @State private var showFavoritesOnly: Bool = false
     @State private var hideCompleted: Bool = false
-    @State private var showPlayerSettings: Bool = false  // Settings Sheet
     
     init(session: ShadowingSession) {
         _viewModel = StateObject(wrappedValue: ShadowingViewModel(session: session))
@@ -39,40 +38,25 @@ struct ShadowingView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // YouTube Player with Settings Button
-            ZStack(alignment: .topTrailing) {
-                if let player = viewModel.player {
-                    YouTubePlayerView(player)
-                        .frame(height: 450)
-                        .cornerRadius(12)
-                        .onAppear {
-                            print("📱 YouTubePlayerView appeared")
-                            print("📹 Video source: \(player.source)")
-                        }
-                } else {
-                    VStack {
-                        ProgressView()
-                        Text("Loading player...")
-                            .foregroundStyle(.secondary)
-                    }
+            // YouTube Player
+            if let player = viewModel.player {
+                YouTubePlayerView(player)
                     .frame(height: 450)
+                    .cornerRadius(12)
+                    .padding()
+                    .onAppear {
+                        print("📱 YouTubePlayerView appeared")
+                        print("📹 Video source: \(player.source)")
+                    }
+            } else {
+                VStack {
+                    ProgressView()
+                    Text("Loading player...")
+                        .foregroundStyle(.secondary)
                 }
-                
-                // Settings Button (Overlay)
-                Button {
-                    showPlayerSettings = true
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.title3)
-                        .foregroundStyle(.white)
-                        .padding(10)
-                        .background(Color.black.opacity(0.6))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(.plain)
+                .frame(height: 450)
                 .padding()
             }
-            .padding()
             
             // Current Sentence Card
             if let sentence = viewModel.currentSentence {
@@ -193,11 +177,6 @@ struct ShadowingView: View {
         }
         .navigationTitle(viewModel.session.video.title ?? "Shadowing")
         .navigationSubtitle("\(viewModel.currentSentenceIndex + 1) / \(viewModel.session.sentences.count)")
-        .sheet(isPresented: $showPlayerSettings) {
-            PlayerSettingsSheet(settings: $viewModel.playerSettings) {
-                viewModel.reloadPlayer()
-            }
-        }
     }
 }
 
