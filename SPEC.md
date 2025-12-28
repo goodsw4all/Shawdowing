@@ -6,11 +6,39 @@
 >
 > **Target Platform**: macOS 15.0+ (Sequoia)
 >
-> **Development Goal**: App Store 출시 가능한 안정적인 앱 개발
+> **Development Goal**: 개인 사용 목적의 macOS 앱 (App Store 미출시)
 >
-> **Core Technology**: YouTubePlayerKit (온라인 스트리밍)
+> **Core Technology**: YouTube 영상 및 자막 활용
 >
 > **Design Philosophy**: 파스텔 톤의 부드럽고 유려한 디자인
+
+---
+
+## ⚠️ Technical Decision: Custom YouTube Player
+
+### 기존 YouTubePlayerKit 제거
+
+**날짜**: 2025-12-28
+
+**결정**: YouTubePlayerKit 대신 YouTubeKit + AVPlayer 사용
+
+**이유:**
+1. **제어 한계 해소**
+   - YouTubePlayerKit은 IFrame API 기반으로 완전한 제어 불가능
+   - 일시정지 시 관련 영상 오버레이 제거 불가
+   - 재생 시간 정밀 제어의 어려움
+
+2. **앱스토어 미출시 결정**
+   - YouTube TOS 문제에서 자유로움
+   - 직접 스트림 추출 및 재생 가능
+
+**구현:**
+- `CustomYouTubePlayer.swift`: YouTubeKit으로 스트림 추출 후 AVPlayer 재생
+- `ShadowingViewModel`: 플레이어 상태 관리 단순화
+- 장점:
+  - 완전한 재생 제어 (seek, pause, play)
+  - 오버레이 없는 깔끔한 UI
+  - 정밀한 자막 동기화 가능
 
 ---
 

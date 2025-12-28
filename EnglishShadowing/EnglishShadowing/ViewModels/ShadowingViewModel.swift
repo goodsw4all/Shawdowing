@@ -7,12 +7,10 @@
 
 import Foundation
 import Combine
-import YouTubePlayerKit
 
 @MainActor
 class ShadowingViewModel: ObservableObject {
     @Published var session: ShadowingSession
-    @Published var player: YouTubePlayer?
     @Published var currentSentenceIndex: Int = 0
     @Published var isPlaying: Bool = false
     @Published var currentTime: TimeInterval = 0
@@ -22,7 +20,6 @@ class ShadowingViewModel: ObservableObject {
     
     private let playerSettings: PlayerSettings  // 전역 설정
     private var cancellables = Set<AnyCancellable>()
-    private var timeObserverTask: Task<Void, Never>?
     private var loopTask: Task<Void, Never>?  // 반복 재생 Task
     
     var currentSentence: SentenceItem? {
@@ -37,103 +34,19 @@ class ShadowingViewModel: ObservableObject {
     init(session: ShadowingSession, playerSettings: PlayerSettings = PlayerSettings()) {
         self.session = session
         self.playerSettings = playerSettings
-        setupPlayer()
+        print("🎬 Initialized ShadowingViewModel with Video ID: \(session.video.id)")
+        
+        // currentTime과 isPlaying 관찰 설정
+        setupObservers()
     }
     
-    private func setupPlayer() {
-        print("🎬 Setting up YouTube Player with Video ID: \(session.video.id)")
-        
-        // Configuration - 기본 설정만 사용
-        // YouTubePlayerKit는 Configuration 초기화 시 playerVars를 직접 지원하지 않음
-        // 대신 기본 Configuration 사용
-        let configuration = YouTubePlayer.Configuration()
-        
-        player = YouTubePlayer(
-            source: .video(id: session.video.id),
-            configuration: configuration
-        )
-        
-        print("⚙️ Player configured")
-        print("   - Video ID: \(session.video.id)")
-        print("   ⚠️  Note: YouTube pause overlay는 YouTube 정책상 제거 불가")
-        print("   ⚠️  controls, rel 등의 파라미터는 YouTubePlayerKit 제약으로 설정 제한됨")
-        startTimeObserver()
-    }
-    
-    /// Player 재생성은 이제 필요 없음 (전역 설정 사용)
-    
-    private func startTimeObserver() {
-        timeObserverTask?.cancel()
-        
-        timeObserverTask = Task { @MainActor in
-            guard let player = player else { return }
-            
-            var lastState: YouTubePlayer.PlaybackState?
-            var hasAutoSeeked = false
-            
-            // 250ms마다 폴링
-            while !Task.isCancelled {
-                do {
-                    // 현재 시간 가져오기
-                    let time = try await player.getCurrentTime()
-                    let seconds = time.converted(to: .seconds).value
-                    self.currentTime = seconds
-                    self.checkSentenceProgress(time: seconds)
-                    
-                    // 현재 상태 가져오기
-                    let state = try await player.getPlaybackState()
-                    
-                    // 상태 변경 감지
-                    if lastState != state {
-                        print("🎥 Playback State Changed: \(state)")
-                        lastState = state
-                        
-                        switch state {
-                        case .unstarted:
-                            print("🔄 State: UNSTARTED")
-                            self.isPlaying = false
-                            
-                            // 최초 한 번만 자동 seek
-                            if !hasAutoSeeked {
-                                hasAutoSeeked = true
-                                try? await Task.sleep(for: .seconds(1))
-                                print("⏩ Auto-seeking to first sentence")
-                                self.seekToCurrentSentence()
-                            }
-                            
-                        case .ended:
-                            print("🏁 State: ENDED")
-                            self.isPlaying = false
-                            
-                        case .playing:
-                            print("✅ State: PLAYING")
-                            self.isPlaying = true
-                            
-                        case .paused:
-                            print("⏸ State: PAUSED")
-                            self.isPlaying = false
-                            
-                        case .buffering:
-                            print("⏳ State: BUFFERING")
-                            
-                        case .cued:
-                            print("📌 State: CUED")
-                            
-                        default:
-                            print("❓ State: UNKNOWN")
-                        }
-                    }
-                    
-                    // 250ms 대기
-                    try await Task.sleep(for: .milliseconds(250))
-                } catch {
-                    if !Task.isCancelled {
-                        print("⚠️ Observer error: \(error)")
-                        try? await Task.sleep(for: .seconds(1))
-                    }
-                }
+    private func setupObservers() {
+        // currentTime 변경 시 문장 진행 상태 체크
+        $currentTime
+            .sink { [weak self] time in
+                self?.checkSentenceProgress(time: time)
             }
-        }
+            .store(in: &cancellables)
     }
     
     private func checkSentenceProgress(time: TimeInterval) {
@@ -156,37 +69,21 @@ class ShadowingViewModel: ObservableObject {
         
         if isNearEnd && isPlaying {
             print("⏸ Auto-pausing at \(time)s (sentence ends at \(sentence.endTime)s)")
-            Task {
-                try? await player?.pause()
-                self.isPlaying = false
-            }
+            isPlaying = false
         }
     }
     
+    // 플레이어 컨트롤 메서드들은 이제 단순히 상태만 변경
+    // 실제 플레이어 제어는 CustomYouTubePlayer가 담당
+    
     func play() {
         print("▶️ Play requested")
-        Task {
-            do {
-                try await player?.play()
-                self.isPlaying = true
-                print("✅ Playing")
-            } catch {
-                print("❌ Play error: \(error)")
-            }
-        }
+        isPlaying = true
     }
     
     func pause() {
         print("⏸ Pause requested")
-        Task {
-            do {
-                try await player?.pause()
-                self.isPlaying = false
-                print("✅ Paused")
-            } catch {
-                print("❌ Pause error: \(error)")
-            }
-        }
+        isPlaying = false
     }
     
     func togglePlayPause() {
@@ -200,43 +97,15 @@ class ShadowingViewModel: ObservableObject {
     func seekToCurrentSentence() {
         guard let sentence = currentSentence else { return }
         print("⏩ Seeking to sentence: \(sentence.text) at \(sentence.startTime)s")
-        Task {
-            do {
-                try await player?.seek(
-                    to: .init(value: sentence.startTime, unit: .seconds),
-                    allowSeekAhead: true
-                )
-                print("✅ Seek completed")
-            } catch {
-                print("❌ Seek error: \(error)")
-            }
-        }
+        currentTime = sentence.startTime
     }
     
     /// 자막 클릭 시: seek + 자동 재생
     func seekAndPlay() {
         guard let sentence = currentSentence else { return }
         print("🎬 Seek and play: \(sentence.text) at \(sentence.startTime)s")
-        
-        Task {
-            do {
-                // 1. Seek to start
-                try await player?.seek(
-                    to: .init(value: sentence.startTime, unit: .seconds),
-                    allowSeekAhead: true
-                )
-                print("⏭️ Seeked to: \(sentence.startTime)s")
-                
-                // 2. Start playing
-                try await player?.play()
-                await MainActor.run {
-                    self.isPlaying = true
-                }
-                print("▶️ Auto-playing")
-            } catch {
-                print("❌ Seek and play failed: \(error)")
-            }
-        }
+        currentTime = sentence.startTime
+        isPlaying = true
     }
     
     func nextSentence() {
@@ -301,13 +170,11 @@ class ShadowingViewModel: ObservableObject {
                 print("🔁 Loop \(i + 1)/\(times)")
                 
                 // Seek to start
-                try? await player?.seek(
-                    to: .init(value: sentence.startTime, unit: .seconds),
-                    allowSeekAhead: true
-                )
+                await MainActor.run {
+                    self.currentTime = sentence.startTime
+                }
                 
                 // Play
-                try? await player?.play()
                 await MainActor.run {
                     self.isPlaying = true
                 }
@@ -323,7 +190,6 @@ class ShadowingViewModel: ObservableObject {
                 }
                 
                 // Pause at end
-                try? await player?.pause()
                 await MainActor.run {
                     self.isPlaying = false
                 }
@@ -381,7 +247,6 @@ class ShadowingViewModel: ObservableObject {
     }
     
     deinit {
-        timeObserverTask?.cancel()
         loopTask?.cancel()
     }
 }

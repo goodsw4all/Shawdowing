@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import YouTubePlayerKit
 
 struct ShadowingView: View {
     @EnvironmentObject var navigationVM: NavigationViewModel
@@ -42,25 +41,15 @@ struct ShadowingView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // YouTube Player
-            if let player = viewModel.player {
-                YouTubePlayerView(player)
-                    .frame(height: 450)
-                    .cornerRadius(12)
-                    .padding()
-                    .onAppear {
-                        print("📱 YouTubePlayerView appeared")
-                        print("📹 Video source: \(player.source)")
-                    }
-            } else {
-                VStack {
-                    ProgressView()
-                    Text("Loading player...")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(height: 450)
-                .padding()
-            }
+            // Custom YouTube Player
+            CustomYouTubePlayer(
+                videoID: viewModel.session.video.id,
+                currentTime: $viewModel.currentTime,
+                isPlaying: $viewModel.isPlaying
+            )
+            .frame(height: 450)
+            .cornerRadius(12)
+            .padding()
             
             // Current Sentence Card
             if let sentence = viewModel.currentSentence {

@@ -17,8 +17,10 @@ struct SidebarView: View {
         List(selection: $selectedSession) {
             Section {
                 ForEach(navigationVM.activeSessions) { session in
-                    SessionRowView(session: session)
-                        .tag(session)
+                    SessionRowView(session: session, onDelete: {
+                        deleteSession(session)
+                    })
+                    .tag(session)
                 }
                 
                 Button {
@@ -48,8 +50,10 @@ struct SidebarView: View {
             
             Section {
                 ForEach(navigationVM.history) { session in
-                    SessionRowView(session: session)
-                        .tag(session)
+                    SessionRowView(session: session, onDelete: {
+                        deleteSession(session)
+                    })
+                    .tag(session)
                 }
             } header: {
                 Label("History", systemImage: "checkmark.circle")
@@ -81,6 +85,13 @@ struct SidebarView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsView()
                 .environmentObject(navigationVM)
+        }
+    }
+    
+    private func deleteSession(_ session: ShadowingSession) {
+        navigationVM.deleteSession(session)
+        if selectedSession?.id == session.id {
+            selectedSession = nil
         }
     }
 }
@@ -120,26 +131,39 @@ struct FavoriteSentenceRow: View {
 
 struct SessionRowView: View {
     let session: ShadowingSession
+    let onDelete: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(session.video.title ?? "Untitled")
-                .font(.body)
-                .lineLimit(1)
-            
-            HStack {
-                Text("\(session.sentences.count) sentences")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(session.video.title ?? "Untitled")
+                    .font(.body)
+                    .lineLimit(1)
                 
-                if session.progress > 0 {
-                    Text("·")
-                        .foregroundStyle(.secondary)
-                    Text("\(Int(session.progress * 100))%")
+                HStack {
+                    Text("\(session.sentences.count) sentences")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    
+                    if session.progress > 0 {
+                        Text("·")
+                            .foregroundStyle(.secondary)
+                        Text("\(Int(session.progress * 100))%")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+            
+            Spacer()
+            
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .foregroundStyle(.red)
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .help("Delete session")
         }
         .padding(.vertical, 2)
     }

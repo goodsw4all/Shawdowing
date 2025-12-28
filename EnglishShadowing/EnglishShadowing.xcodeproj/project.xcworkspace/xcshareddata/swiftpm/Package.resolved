@@ -1,5 +1,5 @@
 {
-  "originHash" : "234d7966a32662471fe84c8023201f53fa42c14f5e6196791e47bc7a4cae14e5",
+  "originHash" : "efa489f3c37e6ecf0764c927f14355d4742835066968c8a13ef5996468434fed",
   "pins" : [
     {
       "identity" : "swift-youtube-transcript",
@@ -11,12 +11,12 @@
       }
     },
     {
-      "identity" : "youtubeplayerkit",
+      "identity" : "youtubekit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/SvenTiigi/YouTubePlayerKit",
+      "location" : "https://github.com/alexeichhorn/YouTubeKit",
       "state" : {
-        "revision" : "1ae827573024ab13dd6adea33b25d3eef6ff667c",
-        "version" : "2.0.5"
+        "revision" : "481c8e3a924ccad893197bdc4577424fae952853",
+        "version" : "0.4.0"
       }
     }
   ],

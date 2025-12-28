@@ -6,10 +6,12 @@
 //
 
 import SwiftUI
+import AppKit
 
 @main
 struct EnglishShadowingApp: App {
     @StateObject private var navigationVM = NavigationViewModel()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var body: some Scene {
         WindowGroup {
@@ -31,5 +33,11 @@ struct EnglishShadowingApp: App {
                 .keyboardShortcut("n", modifiers: .command)
             }
         }
+    }
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return true
     }
 }
