@@ -17,6 +17,21 @@ class NavigationViewModel: ObservableObject {
     private let storageService = StorageService.shared
     private var cancellables = Set<AnyCancellable>()
     
+    // Computed property: 모든 세션에서 즐겨찾기된 문장들
+    var favoriteSentences: [(session: ShadowingSession, sentence: SentenceItem)] {
+        let allSessions = activeSessions + history
+        var favorites: [(ShadowingSession, SentenceItem)] = []
+        
+        for session in allSessions {
+            let favs = session.sentences.filter { $0.isFavorite }
+            for sentence in favs {
+                favorites.append((session, sentence))
+            }
+        }
+        
+        return favorites
+    }
+    
     init() {
         loadAllData()
         createSampleDataIfNeeded()

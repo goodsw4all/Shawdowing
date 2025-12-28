@@ -1,6 +1,15 @@
 {
-  "originHash" : "7b053422b020dce7a9be2c7ef325d71eb584450711cd5f7fb96891e9a6f1c298",
+  "originHash" : "234d7966a32662471fe84c8023201f53fa42c14f5e6196791e47bc7a4cae14e5",
   "pins" : [
+    {
+      "identity" : "swift-youtube-transcript",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/skainguyen1412/swift-youtube-transcript",
+      "state" : {
+        "revision" : "e6fb610ee78d5dff8c8c81589875d43cbc9ef856",
+        "version" : "1.0.0"
+      }
+    },
     {
       "identity" : "youtubeplayerkit",
       "kind" : "remoteSourceControl",

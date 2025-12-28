@@ -149,14 +149,14 @@ graph LR
         S2[YouTubePlayerKit]
     end
     
-    V1 -->|@EnvironmentObject| VM1
-    V2 -->|@StateObject| VM2
-    V3 -->|@EnvironmentObject| VM1
+    V1 -->|EnvironmentObject| VM1
+    V2 -->|StateObject| VM2
+    V3 -->|EnvironmentObject| VM1
     
-    VM1 -->|@Published| M1
-    VM1 -->|@Published| M3
-    VM2 -->|@Published| M1
-    VM2 -->|@Published| M2
+    VM1 -->|Published| M1
+    VM1 -->|Published| M3
+    VM2 -->|Published| M1
+    VM2 -->|Published| M2
     
     VM1 --> S1
     VM2 --> S2
@@ -926,20 +926,20 @@ Disk
 ```mermaid
 graph TB
     subgraph "Global State"
-        A[@StateObject<br/>NavigationViewModel]
+        A[StateObject<br/>NavigationViewModel]
     end
     
     subgraph "Shared via Environment"
-        B[SidebarView<br/>@EnvironmentObject]
-        C[NewSessionView<br/>@EnvironmentObject]
+        B[SidebarView<br/>EnvironmentObject]
+        C[NewSessionView<br/>EnvironmentObject]
     end
     
     subgraph "Local State"
-        D[ShadowingView<br/>@StateObject<br/>ShadowingViewModel]
+        D[ShadowingView<br/>StateObject<br/>ShadowingViewModel]
     end
     
-    A -->|.environmentObject| B
-    A -->|.environmentObject| C
+    A -->|environmentObject| B
+    A -->|environmentObject| C
     D -.->|독립적| D
     
     style A fill:#E3F2FD

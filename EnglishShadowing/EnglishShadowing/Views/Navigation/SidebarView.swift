@@ -29,6 +29,22 @@ struct SidebarView: View {
                 Label("Active", systemImage: "play.circle.fill")
             }
             
+            // 즐겨찾기 섹션
+            Section {
+                ForEach(navigationVM.favoriteSentences, id: \.sentence.id) { item in
+                    FavoriteSentenceRow(
+                        session: item.session,
+                        sentence: item.sentence,
+                        onSelect: {
+                            selectedSession = item.session
+                        }
+                    )
+                }
+            } header: {
+                Label("Favorites", systemImage: "star.fill")
+                    .foregroundStyle(.yellow)
+            }
+            
             Section {
                 ForEach(navigationVM.history) { session in
                     SessionRowView(session: session)
@@ -52,6 +68,39 @@ struct SidebarView: View {
             NewSessionView()
                 .environmentObject(navigationVM)
         }
+    }
+}
+
+struct FavoriteSentenceRow: View {
+    let session: ShadowingSession
+    let sentence: SentenceItem
+    let onSelect: () -> Void
+    
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Image(systemName: "star.fill")
+                        .foregroundStyle(.yellow)
+                        .font(.caption)
+                    
+                    Text(session.video.title ?? "Untitled")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                
+                Text(sentence.text)
+                    .font(.body)
+                    .lineLimit(2)
+                
+                Text(TimeFormatter.formatTime(sentence.startTime))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(.plain)
     }
 }
 

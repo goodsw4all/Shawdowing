@@ -209,6 +209,50 @@ class ShadowingViewModel: ObservableObject {
         }
     }
     
+    func toggleFavoriteSentence() {
+        guard let sentence = currentSentence else { return }
+        
+        if let index = session.sentences.firstIndex(where: { $0.id == sentence.id }) {
+            session.sentences[index].isFavorite.toggle()
+            print("⭐️ Favorite toggled: \(session.sentences[index].isFavorite)")
+        }
+    }
+    
+    func loopCurrentSentence(times: Int) {
+        guard let sentence = currentSentence else { return }
+        
+        Task {
+            for i in 0..<times {
+                print("🔁 Loop \(i + 1)/\(times)")
+                
+                // Seek to start
+                try? await player?.seek(
+                    to: .init(value: sentence.startTime, unit: .seconds),
+                    allowSeekAhead: true
+                )
+                
+                // Play
+                try? await player?.play()
+                self.isPlaying = true
+                
+                // Wait for sentence duration
+                let duration = sentence.duration
+                try? await Task.sleep(for: .seconds(duration))
+                
+                // Pause at end
+                try? await player?.pause()
+                self.isPlaying = false
+                
+                // Wait 1 second before next loop
+                if i < times - 1 {
+                    try? await Task.sleep(for: .seconds(1))
+                }
+            }
+            
+            print("✅ Loop completed")
+        }
+    }
+    
     func markCurrentSentenceCompleted() {
         guard let sentence = currentSentence else { return }
         session.completedSentences.insert(sentence.id)

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2B4A9C1F2F00D46900FF4632 /* YouTubePlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = 2B4A9C1E2F00D46900FF4632 /* YouTubePlayerKit */; };
+		2BE99D1F2F010FBD00149CE2 /* YoutubeTranscript in Frameworks */ = {isa = PBXBuildFile; productRef = 2BE99D1E2F010FBD00149CE2 /* YoutubeTranscript */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2BE99D1F2F010FBD00149CE2 /* YoutubeTranscript in Frameworks */,
 				2B4A9C1F2F00D46900FF4632 /* YouTubePlayerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -71,6 +73,7 @@
 			name = EnglishShadowing;
 			packageProductDependencies = (
 				2B4A9C1E2F00D46900FF4632 /* YouTubePlayerKit */,
+				2BE99D1E2F010FBD00149CE2 /* YoutubeTranscript */,
 			);
 			productName = EnglishShadowing;
 			productReference = 2B4A9C0F2F00D45200FF4632 /* EnglishShadowing.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				2B4A9C1D2F00D46900FF4632 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */,
+				2BE99D1D2F010FBD00149CE2 /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2B4A9C102F00D45200FF4632 /* Products */;
@@ -370,6 +374,14 @@
 				minimumVersion = 2.0.5;
 			};
 		};
+		2BE99D1D2F010FBD00149CE2 /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/skainguyen1412/swift-youtube-transcript";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -377,6 +389,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2B4A9C1D2F00D46900FF4632 /* XCRemoteSwiftPackageReference "YouTubePlayerKit" */;
 			productName = YouTubePlayerKit;
+		};
+		2BE99D1E2F010FBD00149CE2 /* YoutubeTranscript */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2BE99D1D2F010FBD00149CE2 /* XCRemoteSwiftPackageReference "swift-youtube-transcript" */;
+			productName = YoutubeTranscript;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

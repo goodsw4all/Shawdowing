@@ -26,12 +26,12 @@
 mindmap
   root((YouTube 쉐도잉 앱))
     Zero Config
-      yt-dlp 번들
-      ffmpeg 번들
-      설치 불필요
+      설치 즉시 사용
+      외부 설치 불필요
+      Swift 네이티브
     자동화
       자막 자동 추출
-      영상 다운로드
+      타이밍 자동 계산
       구간 반복
     학습 효율
       문장 단위 재생
@@ -48,7 +48,8 @@ mindmap
 | 기능 | 설명 | 가치 |
 |------|------|------|
 | 🎬 **YouTube 스트리밍** | YouTubePlayerKit으로 직접 재생 | 빠른 시작 |
-| 📝 **수동 자막 입력** | 사용자가 학습할 텍스트 직접 입력 | 완전한 통제 |
+| 🤖 **자막 자동 추출** | swift-youtube-transcript로 자동 가져오기 | 편리함 |
+| 📝 **수동 입력 지원** | 자막 없는 영상도 학습 가능 | 유연성 |
 | 🔄 **문장 반복** | 각 문장 3회 자동 반복 | 효율적 암기 |
 | ⏸️ **자동 일시정지** | 문장 끝에서 자동 멈춤 | 따라 말할 시간 |
 | 🎤 **녹음 비교** | 원본 vs 녹음본 재생 | 발음 개선 |
@@ -60,7 +61,7 @@ mindmap
 ## 1. Project Overview (프로젝트 개요)
 
 ### 1.1 Concept
-**YouTube English Shadowing**은 macOS에서 YouTube 영상을 보며 효과적인 **영어 쉐도잉(Shadowing)** 훈련을 할 수 있도록 돕는 학습 도구입니다. **YouTubePlayerKit**을 사용하여 YouTube 영상을 직접 스트리밍하고, 사용자가 입력한 **문장 단위 반복 재생**과 **사용자 발음 녹음/비교** 기능을 통해 실질적인 스피킹 실력 향상을 목표로 합니다.
+**YouTube English Shadowing**은 macOS에서 YouTube 영상을 보며 효과적인 **영어 쉐도잉(Shadowing)** 훈련을 할 수 있도록 돕는 학습 도구입니다. **YouTubePlayerKit**을 사용하여 YouTube 영상을 직접 스트리밍하고, **swift-youtube-transcript**로 자막을 자동 추출하여 **문장 단위 반복 재생**과 **사용자 발음 녹음/비교** 기능을 통해 실질적인 스피킹 실력 향상을 목표로 합니다.
 
 ### 1.2 Target Audience (타겟 유저)
 -   **영어 학습자**: 리스닝과 스피킹 실력을 동시에 키우고 싶은 중급 이상의 학습자
@@ -69,6 +70,7 @@ mindmap
 
 ### 1.3 Key Technology (핵심 기술)
 -   **YouTubePlayerKit**: YouTube 영상 직접 스트리밍 및 재생 제어
+-   **swift-youtube-transcript**: YouTube 자막 자동 추출 (MIT License)
 -   **Speech Framework**: 사용자 발음 인식 및 텍스트 변환 (STT)
 -   **AVFoundation**: 사용자 음성 녹음 및 재생
 -   **SwiftUI (macOS 15+)**: 네이티브 macOS 앱 UI with 파스텔 디자인
@@ -80,7 +82,7 @@ mindmap
 -   **개발 환경**: Xcode 16+, macOS 15.0 (Sequoia) 이상
 -   **온라인 필수**: YouTube 스트리밍 방식으로 인터넷 연결 필수
 -   **앱 크기**: ~5MB (경량 앱)
--   **자막 입력**: 사용자가 직접 학습 텍스트 입력 (수동 방식)
+-   **자막 추출**: swift-youtube-transcript 사용 (자막 없는 영상은 수동 입력)
 
 ### 1.5 YouTubePlayerKit Architecture
 
@@ -92,10 +94,12 @@ graph TB
         subgraph Components
             SwiftUI[SwiftUI Views]
             YPK[YouTubePlayerKit]
+            Transcript[swift-youtube-transcript<br/>자막 추출]
             AVFoundation[AVFoundation<br/>녹음]
             Speech[Speech Framework<br/>STT]
             
             SwiftUI --> YPK
+            SwiftUI --> Transcript
             SwiftUI --> AVFoundation
             SwiftUI --> Speech
         end
@@ -107,67 +111,70 @@ graph TB
     end
     
     subgraph "External Services"
-        YouTube[YouTube iframe API]
+        YouTube[YouTube iframe API<br/>+ Transcript API]
         YPK -->|직접 스트리밍| YouTube
+        Transcript -->|자막 추출| YouTube
     end
     
-    subgraph "User Input"
-        Manual[수동 자막 입력]
+    subgraph "Fallback"
+        Manual[수동 자막 입력<br/>자막 없는 영상용]
         Manual -->|텍스트| SwiftUI
     end
     
     style App fill:#E8EAF6
     style YPK fill:#C5E1A5
+    style Transcript fill:#FFE082
     style YouTube fill:#FF5252,color:#FFF
-    style Manual fill:#FFE0B2
+    style Manual fill:#E0E0E0
 ```
 
-**YouTubePlayerKit 장점**:
+**YouTubePlayerKit + swift-youtube-transcript 장점**:
 1. ✅ App Store 정책 완벽 준수 (외부 바이너리 없음)
 2. ✅ 경량 앱 (~5MB)
 3. ✅ YouTube API 공식 지원
 4. ✅ 정밀한 재생 제어 (seek, playbackRate)
-5. ✅ 간단한 구현
+5. ✅ 자막 자동 추출 (swift-youtube-transcript)
+6. ✅ 간단한 구현
 
 **Trade-offs**:
-- ⚠️ 자막 자동 추출 불가 → 사용자 수동 입력
+- ⚠️ 자막 없는 영상 → 사용자 수동 입력 (Fallback)
 - ⚠️ 오프라인 불가 → 항상 온라인 필요
 - ✅ 법적 안전성 및 유지보수성 우선
 
-### 1.6 Architecture Decision: YouTubePlayerKit 선택 이유
+### 1.6 Architecture Decision: Swift Native 방식 선택
 
 ```mermaid
 graph TB
-    subgraph "YouTubePlayerKit 방식"
-        YPK[YouTubePlayerKit]
+    subgraph "Swift Native 방식 (채택)"
+        YPK[YouTubePlayerKit + swift-youtube-transcript]
         YPK -->|✅| AppStore[App Store 출시 가능]
         YPK -->|✅| Legal[법적 안전성]
         YPK -->|✅| Simple[간단한 구현]
         YPK -->|✅| Official[공식 API 지원]
-        YPK -->|⚠️| ManualSub[수동 자막 입력]
+        YPK -->|✅| AutoSub[자막 자동 추출]
         YPK -->|⚠️| OnlineOnly[온라인 전용]
     end
     
-    subgraph "yt-dlp 방식"
+    subgraph "yt-dlp 방식 (제외)"
         YTDLP[yt-dlp + AVPlayer]
         YTDLP -->|❌| NoAppStore[App Store 불가]
         YTDLP -->|❌| LegalRisk[법적 위험]
         YTDLP -->|⚠️| Complex[복잡한 구현]
-        YTDLP -->|✅| AutoSub[자동 자막 추출]
-        YTDLP -->|✅| Offline[오프라인 지원]
+        YTDLP -->|✅| FullOffline[완전 오프라인]
     end
     
     Decision{프로젝트<br/>우선순위}
     Decision -->|안정성 & 출시| YPK
     Decision -->|App Store| YPK
     Decision -->|유지보수성| YPK
+    Decision -->|사용자 편의성| YPK
     
     style YPK fill:#C8E6C9
     style YTDLP fill:#FFCDD2
     style Decision fill:#B3E5FC
 ```
 
-**결론**: YouTubePlayerKit으로 안정적이고 출시 가능한 앱을 만듭니다.
+**결론**: YouTubePlayerKit + swift-youtube-transcript로 안정적이고 출시 가능한 앱을 만듭니다.
 
 ### 1.7 Design System: 파스텔 톤 가이드
 
@@ -462,12 +469,14 @@ class YouTubePlayerService: ObservableObject {
     -   `player.playbackStatePublisher` → 재생 상태
     -   Combine으로 실시간 동기화
 
-### Phase 4: User Input & Timing Setup
-**목표**: 사용자 입력 기반 문장 타이밍 설정 구현
+### Phase 4: Subtitle Extraction & Timing Setup
+**목표**: 자막 자동 추출 및 타이밍 설정 구현
 
 #### 핵심 기능
--   **문장 입력**: 멀티라인 텍스트 에디터로 학습 문장 입력
--   **타이밍 설정**: 각 문장의 시작/종료 시간 수동 설정
+-   **자막 자동 추출**: swift-youtube-transcript로 YouTube 자막 가져오기
+-   **문장 병합**: 짧은 자막 조각을 의미 있는 문장 단위로 합치기
+-   **수동 입력 지원**: 자막 없는 영상은 사용자가 직접 입력 (Fallback)
+-   **타이밍 자동 계산**: 자막 타임스탬프 활용 또는 추정
 -   **프리뷰 모드**: 설정한 타이밍대로 재생하여 확인
 -   **구간 점프**: 문장 클릭 시 해당 시간으로 이동
 -   **재생 속도 조절**: 0.5x ~ 2.0x (학습 속도 조절)
@@ -570,15 +579,17 @@ class YouTubePlayerService: ObservableObject {
 │  ┌──────────────────────────────────┐ │
 │  │ https://youtube.com/watch?v=...  │ │
 │  └──────────────────────────────────┘ │
+│  [🤖 자막 자동 추출] ✅ Video ID 인식  │
 │                                        │
-│  학습할 문장 입력:                      │
+│  학습할 문장:                           │
 │  ┌──────────────────────────────────┐ │
-│  │ Hello, welcome to this video.    │ │
+│  │ Hello, welcome to this video.    │ │  ← 자동 추출됨
 │  │ This is a sample sentence.       │ │
 │  │ The actual subtitle goes here.   │ │
 │  └──────────────────────────────────┘ │
+│  📊 10 문장 | 자동 타이밍 적용됨        │
 │                                        │
-│  타이밍: ⚙️ 자동(5초) ▼  또는 수동     │
+│  💡 자막 없는 영상? 직접 입력하세요     │
 │                                        │
 │  [임시저장]  [프리뷰]  [시작하기]      │
 └────────────────────────────────────────┘
@@ -651,17 +662,22 @@ flowchart TD
     ValidateURL -->|Invalid| Error1[에러 표시]
     ValidateURL -->|Valid| ExtractVideoID[Video ID 추출]
     
-    ExtractVideoID --> InputSentences[문장 입력<br/>멀티라인 텍스트]
-    InputSentences --> AutoTiming{타이밍 설정}
+    ExtractVideoID --> AutoExtract[자막 자동 추출 시도<br/>swift-youtube-transcript]
     
-    AutoTiming -->|자동| CalcTiming[5초 간격 자동 계산]
-    AutoTiming -->|수동| ManualTiming[사용자 수동 설정]
+    AutoExtract --> HasSubtitle{자막 존재?}
     
-    CalcTiming --> Preview[프리뷰 모드]
-    ManualTiming --> Preview
+    HasSubtitle -->|Yes| ParseSubtitle[자막 파싱 & 문장 병합]
+    HasSubtitle -->|No| ManualInput[수동 입력 안내]
+    
+    ParseSubtitle --> ShowSentences[자막 표시<br/>타이밍 자동 설정됨]
+    ManualInput --> UserInput[사용자가 직접 입력]
+    UserInput --> CalcTiming[타이밍 자동 계산]
+    
+    ShowSentences --> Preview[프리뷰 모드]
+    CalcTiming --> Preview
     
     Preview --> Confirm{설정 확인}
-    Confirm -->|수정| InputSentences
+    Confirm -->|수정| ShowSentences
     Confirm -->|확인| LoadPlayer[YouTubePlayer 로드]
     
     LoadPlayer --> ShowShadowing[쉐도잉 화면]
@@ -670,6 +686,7 @@ flowchart TD
     style Start fill:#90EE90
     style End fill:#90EE90
     style Error1 fill:#FFB6C1
+    style AutoExtract fill:#FFE082
     style Preview fill:#FFE4B5
 ```
 
@@ -1007,6 +1024,7 @@ EnglishShadowing-macOS/
 │   │   └── ShadowingViewModel.swift     // 통합 ViewModel
 │   ├── Services/
 │   │   ├── YouTubePlayerService.swift   // YouTubePlayerKit 관리
+│   │   ├── TranscriptService.swift      // 자막 추출 (swift-youtube-transcript)
 │   │   ├── RecordingService.swift       // 음성 녹음
 │   │   ├── TimingService.swift          // 타이밍 계산
 │   │   └── PersistenceService.swift     // 데이터 저장
@@ -1027,10 +1045,11 @@ EnglishShadowing-macOS/
 ## 8. Reference (참고 자료)
 
 ### Essential
--   [YouTubePlayerKit](https://github.com/SvenTiigi/YouTubePlayerKit)
+-   [YouTubePlayerKit](https://github.com/SvenTiigi/YouTubePlayerKit) - YouTube 영상 재생
+-   [swift-youtube-transcript](https://github.com/spaceman1412/swift-youtube-transcript) - 자막 자동 추출 (MIT License)
 -   [YouTube iframe Player API](https://developers.google.com/youtube/iframe_api_reference)
--   [AVFoundation](https://developer.apple.com/documentation/avfoundation)
--   [Speech Framework](https://developer.apple.com/documentation/speech)
+-   [AVFoundation](https://developer.apple.com/documentation/avfoundation) - 음성 녹음
+-   [Speech Framework](https://developer.apple.com/documentation/speech) - 음성 인식
 
 ### Additional
 -   [SwiftUI for macOS](https://developer.apple.com/documentation/swiftui)
@@ -1041,10 +1060,11 @@ EnglishShadowing-macOS/
 ## 9. Known Limitations (알려진 제한사항)
 
 1.  **온라인 전용**: 인터넷 연결 필수 (오프라인 불가)
-2.  **수동 입력**: 자막 자동 추출 불가, 사용자가 직접 입력
+2.  **자막 의존성**: 자막 없는 영상은 수동 입력 필요 (swift-youtube-transcript 제약)
 3.  **YouTube 정책**: iframe API 정책 변경 시 영향 가능
-4.  **타이밍 정확도**: 자동 타이밍은 추정치, 수동 조정 권장
+4.  **타이밍 정확도**: 자동 추출된 타이밍이 부정확할 수 있음 (수동 조정 권장)
 5.  **Age-restricted**: 연령 제한 영상은 재생 불가
+6.  **Rate Limiting**: 자막 추출 API 과도한 호출 시 제한 가능
 
 ---
 
@@ -1056,6 +1076,7 @@ EnglishShadowing-macOS/
 graph TB
     subgraph "사용된 라이브러리"
         YPK[YouTubePlayerKit<br/>MIT License]
+        Transcript[swift-youtube-transcript<br/>MIT License]
     end
     
     subgraph "Apple Frameworks"
@@ -1070,14 +1091,25 @@ graph TB
     end
     
     YPK --> Notice
+    Transcript --> Notice
     Notice --> About
     
     style YPK fill:#C8E6C9
+    style Transcript fill:#FFE082
     style About fill:#B3E5FC
 ```
 
 #### YouTubePlayerKit
 - **라이센스**: MIT License
+- **권리**: 자유롭게 사용, 수정, 배포 가능
+- **의무**: 라이센스 고지 포함
+- **링크**: [GitHub Repository](https://github.com/SvenTiigi/YouTubePlayerKit)
+
+#### swift-youtube-transcript
+- **라이센스**: MIT License
+- **권리**: 자유롭게 사용, 수정, 배포 가능
+- **의무**: 라이센스 고지 포함
+- **링크**: [GitHub Repository](https://github.com/spaceman1412/swift-youtube-transcript)
 - **권리**: 자유롭게 사용, 수정, 배포 가능
 - **의무**: 라이센스 고지 포함
 - **링크**: [GitHub Repository](https://github.com/SvenTiigi/YouTubePlayerKit)
@@ -1097,7 +1129,13 @@ graph TB
 │    by Sven Tiigi                            │
 │    https://github.com/SvenTiigi/            │
 │      YouTubePlayerKit                       │
-│    [View License] 버튼                      │
+│                                              │
+│  • swift-youtube-transcript (MIT License)   │
+│    by spaceman1412                          │
+│    https://github.com/spaceman1412/         │
+│      swift-youtube-transcript               │
+│                                              │
+│    [View Licenses] 버튼                     │
 │                                              │
 │  소스 코드:                                  │
 │  [GitHub Repository] 버튼                   │
@@ -1127,14 +1165,16 @@ graph TB
 
 ✅ **정책 준수 사항**:
 1. 외부 바이너리 미사용
-2. YouTube 공식 API 사용
-3. 영상 다운로드 기능 없음
-4. 오픈소스 라이센스 고지
-5. 개인정보 수집 없음
+2. YouTube 공식 API 사용 (영상 재생)
+3. 자막 자동 추출 (공개 데이터 활용)
+4. 영상 다운로드 기능 없음
+5. 오픈소스 라이센스 고지
+6. 개인정보 수집 없음
 
 ⚠️ **검토 시 주의사항**:
 - YouTube API 사용 목적 명시
 - 교육 목적 앱임을 강조
+- 자막 추출은 공개 자막 활용 (개인 학습 목적)
 - 스크린샷에 저작권 없는 영상 사용
 
 ---
@@ -1146,15 +1186,18 @@ graph TB
 -   **단어장 기능**: 어려운 단어 저장 및 복습
 -   **AI 발음 분석**: Speech Recognition으로 정확도 측정
 -   **iCloud 동기화**: 여러 Mac에서 학습 진도 공유
+-   **다국어 자막 지원**: 영어 외 다른 언어 자막 추출
 
 ### Advanced Features
--   **자동 자막 가져오기**: YouTube Data API v3로 자막 추출 (가능 시)
+-   **자막 품질 개선**: 문장 병합 알고리즘 고도화
 -   **Playlist 지원**: 여러 영상을 순차적으로 학습
 -   **학습 목표 설정**: 일일/주간 목표 설정 및 알림
 -   **iOS/iPadOS 확장**: iPhone, iPad 버전 개발
+-   **커스텀 자막 편집**: 타이밍 및 텍스트 수정 기능
 
 ---
 
-**문서 버전**: 2.0.0  
-**작성일**: 2025-12-27  
+**문서 버전**: 3.0.0  
+**작성일**: 2025-12-28  
+**최종 수정**: 2025-12-28 (swift-youtube-transcript 추가)  
 **목적**: macOS 전용 YouTube 쉐도잉 학습 도구 개발

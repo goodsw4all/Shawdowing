@@ -15,6 +15,9 @@ struct SentenceItem: Identifiable, Codable, Hashable {
     var repeatCount: Int = 3
     var recordings: [URL] = []
     var isCompleted: Bool = false
+    var isFavorite: Bool = false  // 즐겨찾기 (저장된 문장)
+    var currentRepeat: Int = 0    // 현재 반복 횟수
+    var notes: String = ""        // 메모
     
     var duration: TimeInterval {
         endTime - startTime

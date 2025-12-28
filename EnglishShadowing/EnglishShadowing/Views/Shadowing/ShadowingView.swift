@@ -47,23 +47,58 @@ struct ShadowingView: View {
             }
             
             // Sentence List
-            ScrollViewReader { proxy in
-                List(Array(viewModel.session.sentences.enumerated()), id: \.element.id) { index, sentence in
-                    SentenceRow(
-                        sentence: sentence,
-                        isCurrentlyPlaying: index == viewModel.currentSentenceIndex,
-                        onTap: {
-                            viewModel.currentSentenceIndex = index
-                            viewModel.seekToCurrentSentence()
-                        }
-                    )
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("자막 리스트")
+                        .font(.headline)
+                    
+                    Spacer()
+                    
+                    // Filter buttons
+                    Button {
+                        // Show all
+                    } label: {
+                        Text("전체")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button {
+                        // Show favorites only
+                    } label: {
+                        Image(systemName: "star.fill")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .listStyle(.plain)
-                .frame(maxHeight: 200)
-                .onChange(of: viewModel.currentSentenceIndex) { _, newIndex in
-                    if newIndex < viewModel.session.sentences.count {
-                        withAnimation {
-                            proxy.scrollTo(viewModel.session.sentences[newIndex].id, anchor: .center)
+                .padding(.horizontal)
+                
+                ScrollViewReader { proxy in
+                    List(Array(viewModel.session.sentences.enumerated()), id: \.element.id) { index, sentence in
+                        SentenceRow(
+                            sentence: sentence,
+                            isCurrentlyPlaying: index == viewModel.currentSentenceIndex,
+                            onTap: {
+                                viewModel.currentSentenceIndex = index
+                                viewModel.seekToCurrentSentence()
+                            },
+                            onFavorite: {
+                                viewModel.currentSentenceIndex = index
+                                viewModel.toggleFavoriteSentence()
+                            },
+                            onLoop: {
+                                viewModel.currentSentenceIndex = index
+                                viewModel.loopCurrentSentence(times: 3)
+                            }
+                        )
+                    }
+                    .listStyle(.plain)
+                    .frame(maxHeight: 250)
+                    .onChange(of: viewModel.currentSentenceIndex) { _, newIndex in
+                        if newIndex < viewModel.session.sentences.count {
+                            withAnimation {
+                                proxy.scrollTo(viewModel.session.sentences[newIndex].id, anchor: .center)
+                            }
                         }
                     }
                 }
@@ -129,43 +164,91 @@ struct SentenceRow: View {
     let sentence: SentenceItem
     let isCurrentlyPlaying: Bool
     let onTap: () -> Void
+    let onFavorite: () -> Void
+    let onLoop: () -> Void
+    
+    @State private var showLoopMenu = false
     
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                Image(systemName: sentence.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(sentence.isCompleted ? .green : .secondary)
+        HStack(spacing: 12) {
+            // Favorite button
+            Button(action: onFavorite) {
+                Image(systemName: sentence.isFavorite ? "star.fill" : "star")
+                    .foregroundStyle(sentence.isFavorite ? .yellow : .secondary)
                     .font(.title3)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(sentence.text)
-                        .font(.body)
-                        .lineLimit(2)
-                        .foregroundStyle(isCurrentlyPlaying ? .primary : .secondary)
+            }
+            .buttonStyle(.plain)
+            
+            // Main content (clickable)
+            Button(action: onTap) {
+                HStack(spacing: 12) {
+                    Image(systemName: sentence.isCompleted ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(sentence.isCompleted ? .green : .secondary)
+                        .font(.title3)
                     
-                    Text("\(TimeFormatter.formatTime(sentence.startTime)) - \(TimeFormatter.formatTime(sentence.endTime))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                if isCurrentlyPlaying {
-                    Image(systemName: "waveform")
-                        .foregroundStyle(.blue)
-                        .symbolEffect(.pulse)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(sentence.text)
+                            .font(.body)
+                            .lineLimit(2)
+                            .foregroundStyle(isCurrentlyPlaying ? .primary : .secondary)
+                        
+                        HStack {
+                            Text("\(TimeFormatter.formatTime(sentence.startTime)) - \(TimeFormatter.formatTime(sentence.endTime))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            if sentence.isFavorite {
+                                Text("⭐️")
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    if isCurrentlyPlaying {
+                        Image(systemName: "waveform")
+                            .foregroundStyle(.blue)
+                            .symbolEffect(.pulse)
+                    }
                 }
             }
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            
+            // Loop button with menu
+            Menu {
+                Button("1회 반복") { 
+                    if let index = sentence.id as? Int {
+                        // Loop 1 time
+                    }
+                }
+                Button("3회 반복") { 
+                    // Loop 3 times
+                }
+                Button("5회 반복") { 
+                    // Loop 5 times
+                }
+                Button("10회 반복") { 
+                    // Loop 10 times
+                }
+            } label: {
+                Image(systemName: "repeat")
+                    .foregroundStyle(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .frame(width: 30)
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .contentShape(Rectangle())
         .background(isCurrentlyPlaying ? Color.blue.opacity(0.1) : Color.clear)
+        .cornerRadius(8)
     }
 }
 
 struct ControlPanelView: View {
     @ObservedObject var viewModel: ShadowingViewModel
+    @State private var showLoopOptions = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -191,10 +274,30 @@ struct ControlPanelView: View {
                 Divider()
                     .frame(height: 30)
                 
-                Button(action: viewModel.repeatCurrentSentence) {
-                    Label("반복", systemImage: "arrow.counterclockwise")
+                // Loop menu
+                Menu {
+                    Button("1회 반복") {
+                        viewModel.loopCurrentSentence(times: 1)
+                    }
+                    Button("3회 반복") {
+                        viewModel.loopCurrentSentence(times: 3)
+                    }
+                    Button("5회 반복") {
+                        viewModel.loopCurrentSentence(times: 5)
+                    }
+                    Button("10회 반복") {
+                        viewModel.loopCurrentSentence(times: 10)
+                    }
+                } label: {
+                    Label("반복", systemImage: "repeat")
                 }
                 .buttonStyle(.bordered)
+                
+                Button(action: viewModel.toggleFavoriteSentence) {
+                    Label("저장", systemImage: viewModel.currentSentence?.isFavorite == true ? "star.fill" : "star")
+                }
+                .buttonStyle(.bordered)
+                .foregroundStyle(viewModel.currentSentence?.isFavorite == true ? .yellow : .primary)
                 
                 Button(action: viewModel.markCurrentSentenceCompleted) {
                     Label("완료", systemImage: "checkmark")
