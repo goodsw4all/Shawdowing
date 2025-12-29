@@ -225,6 +225,19 @@ class ShadowingViewModel: ObservableObject {
         }
     }
     
+    /// 문장별 프로소디 체크리스트 버튼을 클릭할 때 호출하여 현재 강세·리듬·연음 평가를 순환시켜 사용자가 즉시 자기 피드백을 적재할 수 있게 한다.
+    func cycleProsodyScore(for metric: ProsodyMetric) {
+        guard let sentence = currentSentence else { return }
+        
+        guard let index = session.sentences.firstIndex(where: { $0.id == sentence.id }) else {
+            return
+        }
+        
+        session.sentences[index].prosodyAssessment.cycle(metric: metric)
+        saveSession()
+        objectWillChange.send()
+    }
+    
     func setPlaybackRate(_ rate: Double) {
         playbackRate = rate
         print("🎚️ Playback rate updated to \(rate)x (UI only)")

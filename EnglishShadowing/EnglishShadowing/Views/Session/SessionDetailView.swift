@@ -38,14 +38,14 @@ struct SessionDetailView: View {
                         
                         Spacer()
                         
-                        VStack(alignment: .leading) {
-                            Text("Sentences")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text("\(session.completedSentences.count)/\(session.sentences.count)")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                        }
+//                        VStack(alignment: .leading) {
+//                            Text("Sentences")
+//                                .font(.caption)
+//                                .foregroundStyle(.secondary)
+//                            Text("\(session.completedSentences.count)/\(session.sentences.count)")
+//                                .font(.title3)
+//                                .fontWeight(.semibold)
+//                        }
                     }
                     
                     ProgressView(value: session.progress)
