@@ -14,6 +14,7 @@ struct NewSessionView: View {
     @State private var youtubeURL: String = "https://www.youtube.com/watch?v=dYCpuqbXjmg"
     @State private var sentencesText: String = ""
     @State private var videoTitle: String = ""
+    @State private var videoThumbnailURL: URL? = nil
     @State private var intervalSeconds: Double = 5.0
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
@@ -228,15 +229,17 @@ struct NewSessionView: View {
         print("🎬 Starting transcript extraction for video: \(videoID)")
         
         do {
-            // 1. 비디오 제목 가져오기 (비어있을 때만)
+            // 1. 비디오 메타데이터 가져오기 (제목 등)
             if videoTitle.isEmpty {
                 do {
-                    let title = try await TranscriptService.shared.fetchVideoTitle(videoID: videoID)
+                    let metadata = try await YouTubeMetadataService.shared.fetchMetadata(videoID: videoID)
                     await MainActor.run {
-                        videoTitle = title
+                        videoTitle = metadata.title
+                        videoThumbnailURL = metadata.thumbnailURL
+                        print("✅ Video title fetched: \(metadata.title)")
                     }
                 } catch {
-                    print("⚠️ Could not fetch video title: \(error)")
+                    print("⚠️ Could not fetch video metadata: \(error)")
                     // 제목 가져오기 실패해도 계속 진행
                 }
             }
@@ -292,7 +295,8 @@ struct NewSessionView: View {
         // Create Video
         let video = YouTubeVideo(
             id: videoID,
-            title: videoTitle.isEmpty ? nil : videoTitle
+            title: videoTitle.isEmpty ? nil : videoTitle,
+            thumbnailURL: videoThumbnailURL
         )
         
         // 자막에서 추출한 문장이 있으면 사용 (타이밍 포함)

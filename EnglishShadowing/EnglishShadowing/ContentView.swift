@@ -17,16 +17,6 @@ struct ContentView: View {
             // Sidebar
             SidebarView(selectedSession: $selectedSession)
                 .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
-        } content: {
-            // Detail View
-            if let session = selectedSession {
-                SessionDetailView(session: session)
-                    .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 400)
-            } else {
-                Text("Select a session")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
         } detail: {
             // Content View
             if let session = selectedSession {

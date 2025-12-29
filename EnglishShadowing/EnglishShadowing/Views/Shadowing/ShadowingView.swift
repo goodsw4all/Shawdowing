@@ -52,6 +52,95 @@ struct ShadowingView: View {
             .cornerRadius(12)
             .padding()
             
+            // Session Info Card
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    // 썸네일 또는 플레이스홀더
+                    if let thumbnailURL = viewModel.session.video.thumbnailURL {
+                        AsyncImage(url: thumbnailURL) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(width: 80, height: 60)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 80, height: 60)
+                                    .clipped()
+                                    .cornerRadius(8)
+                            case .failure:
+                                Image(systemName: "film")
+                                    .font(.title)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 80, height: 60)
+                                    .background(Color(nsColor: .controlBackgroundColor))
+                                    .cornerRadius(8)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                    } else {
+                        Image(systemName: "film")
+                            .font(.title)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 80, height: 60)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .cornerRadius(8)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let title = viewModel.session.video.title, !title.isEmpty {
+                            Text(title)
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .lineLimit(2)
+                        } else {
+                            Text("YouTube Video")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Label("ID: \(viewModel.session.video.id)", systemImage: "link")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Divider()
+                
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text("Progress")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("\(Int(viewModel.session.progress * 100))%")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .leading) {
+                        Text("Sentences")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("\(viewModel.session.completedSentences.count)/\(viewModel.session.sentences.count)")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                    }
+                }
+                
+                ProgressView(value: viewModel.session.progress)
+                    .tint(Color(hex: "#A8DADC"))
+            }
+            .padding()
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(12)
+            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+            .padding(.horizontal)
+            
             // Current Sentence Card
             if let sentence = viewModel.currentSentence {
                 CurrentSentenceCard(
@@ -504,6 +593,33 @@ private extension ProsodyScore {
         case .notEvaluated: return .primary
         default: return .white
         }
+    }
+}
+
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3:
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6:
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8:
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue:  Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
 
