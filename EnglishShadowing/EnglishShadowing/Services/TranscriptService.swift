@@ -102,10 +102,14 @@ class TranscriptService {
             
             print("✅ Fetched \(transcript.count) subtitle entries")
             
-            // 2. TranscriptEntry → SentenceItem 변환
+            // 2. TranscriptEntry → SentenceItem 변환 + HTML entities 디코딩
             let sentences = transcript.map { entry in
-                SentenceItem(
-                    text: entry.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines),
+                let decodedText = entry.text
+                    .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+                    .decodingCommonHTMLEntities()  // ✅ HTML entities 디코딩
+                
+                return SentenceItem(
+                    text: decodedText,
                     startTime: entry.offset,
                     endTime: entry.offset + entry.duration
                 )

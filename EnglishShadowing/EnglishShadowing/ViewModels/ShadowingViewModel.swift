@@ -31,7 +31,7 @@ class ShadowingViewModel: ObservableObject {
         currentSentenceIndex >= session.sentences.count - 1
     }
     
-    init(session: ShadowingSession, playerSettings: PlayerSettings = PlayerSettings()) {
+    init(session: ShadowingSession, playerSettings: PlayerSettings) {
         self.session = session
         self.playerSettings = playerSettings
         print("🎬 Initialized ShadowingViewModel with Video ID: \(session.video.id)")

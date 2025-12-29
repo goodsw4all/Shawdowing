@@ -270,7 +270,7 @@ struct NewSessionView: View {
                 transcriptError = error.userFriendlyMessage
                 isLoadingTranscript = false
                 
-                print("❌ Transcript extraction failed: \(error.localizedDescription ?? "Unknown error")")
+                print("❌ Transcript extraction failed: \(error.localizedDescription)")
             }
         } catch {
             await MainActor.run {

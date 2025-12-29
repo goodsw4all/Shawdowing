@@ -13,7 +13,7 @@ struct ShadowingView: View {
     @State private var showFavoritesOnly: Bool = false
     @State private var hideCompleted: Bool = false
     
-    init(session: ShadowingSession, playerSettings: PlayerSettings = PlayerSettings()) {
+    init(session: ShadowingSession, playerSettings: PlayerSettings) {
         _viewModel = StateObject(wrappedValue: ShadowingViewModel(
             session: session,
             playerSettings: playerSettings
@@ -45,7 +45,8 @@ struct ShadowingView: View {
             CustomYouTubePlayer(
                 videoID: viewModel.session.video.id,
                 currentTime: $viewModel.currentTime,
-                isPlaying: $viewModel.isPlaying
+                isPlaying: $viewModel.isPlaying,
+                playbackRate: $viewModel.playbackRate
             )
             .frame(height: 450)
             .cornerRadius(12)
@@ -145,9 +146,9 @@ struct ShadowingView: View {
                                     viewModel.currentSentenceIndex = item.index
                                     viewModel.toggleFavoriteSentence()
                                 },
-                                onLoop: {
+                                onLoop: { times in
                                     viewModel.currentSentenceIndex = item.index
-                                    viewModel.loopCurrentSentence(times: 3)
+                                    viewModel.loopCurrentSentence(times: times)
                                 }
                             )
                         }
@@ -225,7 +226,7 @@ struct SentenceRow: View {
     let isCurrentlyPlaying: Bool
     let onTap: () -> Void
     let onFavorite: () -> Void
-    let onLoop: () -> Void
+    let onLoop: (Int) -> Void  // 반복 횟수를 인자로 받음
     
     @State private var showLoopMenu = false
     
@@ -277,17 +278,17 @@ struct SentenceRow: View {
             
             // Loop button with menu
             Menu {
-                Button("1회 반복") { 
-                    // Loop 1 time - handled by onLoop
+                Button("1회 반복") {
+                    onLoop(1)
                 }
-                Button("3회 반복") { 
-                    // Loop 3 times
+                Button("3회 반복") {
+                    onLoop(3)
                 }
-                Button("5회 반복") { 
-                    // Loop 5 times
+                Button("5회 반복") {
+                    onLoop(5)
                 }
-                Button("10회 반복") { 
-                    // Loop 10 times
+                Button("10회 반복") {
+                    onLoop(10)
                 }
             } label: {
                 Image(systemName: "repeat")
@@ -414,8 +415,9 @@ struct ControlPanelView: View {
         SentenceItem(text: "This is a sample sentence.", startTime: 10, endTime: 15)
     ]
     let session = ShadowingSession(video: video, sentences: sentences)
+    let settings = PlayerSettings()
     
-    return NavigationStack {
-        ShadowingView(session: session)
+    NavigationStack {
+        ShadowingView(session: session, playerSettings: settings)
     }
 }

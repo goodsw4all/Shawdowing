@@ -16,11 +16,13 @@ struct CustomYouTubePlayer: View {
     let videoID: String
     @Binding var currentTime: Double
     @Binding var isPlaying: Bool
+    @Binding var playbackRate: Double
     
     @StateObject private var playerManager = YouTubePlayerManager()
     @State private var player: AVPlayer?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var isSeeking = false  // seek 무한루프 방지
     
     var body: some View {
         ZStack {
@@ -49,18 +51,30 @@ struct CustomYouTubePlayer: View {
                             player.play()
                         }
                     }
-                    .onChange(of: isPlaying) { newValue in
+                    .onChange(of: isPlaying) { _, newValue in
                         if newValue {
+                            player.rate = Float(playbackRate)  // 재생 속도 적용
                             player.play()
                         } else {
                             player.pause()
                         }
                     }
-                    .onChange(of: currentTime) { newTime in
+                    .onChange(of: playbackRate) { _, newRate in
+                        // 재생 속도 변경
+                        if isPlaying {
+                            player.rate = Float(newRate)
+                        }
+                    }
+                    .onChange(of: currentTime) { _, newTime in
+                        guard !isSeeking else { return }  // seek 중 무시
+                        
                         // 현재 시간과 요청된 시간이 1초 이상 차이나면 seek
                         let currentPlayerTime = player.currentTime().seconds
                         if abs(currentPlayerTime - newTime) > 1.0 {
-                            player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+                            isSeeking = true
+                            player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600)) { _ in
+                                isSeeking = false
+                            }
                         }
                     }
             }
@@ -132,9 +146,9 @@ struct CustomYouTubePlayer: View {
         
         // 재생 시간 업데이트
         let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
-        player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+        player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [self] time in
             let seconds = time.seconds
-            if !seconds.isNaN && !seconds.isInfinite {
+            if !seconds.isNaN && !seconds.isInfinite && !isSeeking {
                 currentTime = seconds
             }
         }
@@ -165,7 +179,8 @@ struct CustomYouTubePlayer_Previews: PreviewProvider {
         CustomYouTubePlayer(
             videoID: "dQw4w9WgXcQ",
             currentTime: .constant(0),
-            isPlaying: .constant(false)
+            isPlaying: .constant(false),
+            playbackRate: .constant(1.0)
         )
         .frame(height: 400)
         .padding()
