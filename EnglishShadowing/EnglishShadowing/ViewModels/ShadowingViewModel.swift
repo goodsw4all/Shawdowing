@@ -21,6 +21,8 @@ class ShadowingViewModel: ObservableObject {
     private let playerSettings: PlayerSettings  // 전역 설정
     private var cancellables = Set<AnyCancellable>()
     private var loopTask: Task<Void, Never>?  // 반복 재생 Task
+    private var isManualSeeking: Bool = false  // 수동 seek 중인지 표시
+    private var hasAutoPaused: Bool = false  // 자동 일시정지 완료 플래그
     
     var currentSentence: SentenceItem? {
         guard currentSentenceIndex < session.sentences.count else { return nil }
@@ -52,24 +54,37 @@ class ShadowingViewModel: ObservableObject {
     private func checkSentenceProgress(time: TimeInterval) {
         guard let sentence = currentSentence else { return }
         
-        // 1. 현재 재생 시간에 맞는 자막 인덱스 찾기 (동기화)
-        if let matchingIndex = session.sentences.firstIndex(where: { 
-            time >= $0.startTime && time < $0.endTime 
-        }) {
-            // 인덱스가 변경되었을 때만 업데이트
-            if matchingIndex != currentSentenceIndex {
-                print("🔄 Auto-updating sentence index: \(currentSentenceIndex) → \(matchingIndex) at \(time)s")
-                currentSentenceIndex = matchingIndex
-                repeatCount = 0
-            }
+        // seek 직후 안정화 대기: 문장 시작 후 0.3초까지는 체크 건너뛰기
+        if time < sentence.startTime + 0.3 {
+            return
         }
         
-        // 2. 문장 끝에서 자동 일시정지
-        let isNearEnd = time >= (sentence.endTime - 0.5) && time <= (sentence.endTime + 0.5)
-        
-        if isNearEnd && isPlaying {
-            print("⏸ Auto-pausing at \(time)s (sentence ends at \(sentence.endTime)s)")
+        // 문장 끝에서 자동 일시정지 체크
+        // endTime 0.05초 전부터 체크 (자연스러운 일시정지)
+        if time >= sentence.endTime - 0.05 && isPlaying && !hasAutoPaused {
+            let overrun = time - sentence.endTime
+            print("⏸ Auto-pausing:")
+            print("   - Current: \(String(format: "%.3f", time))s")
+            print("   - End: \(String(format: "%.3f", sentence.endTime))s")
+            print("   - Overrun: \(String(format: "%.3f", overrun))s")
+            print("   - Text: \(sentence.text.prefix(50))...")
+            
             isPlaying = false
+            hasAutoPaused = true
+            return
+        }
+        
+        // 안전장치: 0.5초 이상 오버런 시 강제 일시정지
+        if time >= sentence.endTime + 0.5 && isPlaying {
+            print("⚠️ Emergency pause (overrun: \(String(format: "%.3f", time - sentence.endTime))s)")
+            isPlaying = false
+            hasAutoPaused = true
+            return
+        }
+        
+        // 수동 seek 중에는 아래 로직 비활성화
+        if isManualSeeking {
+            return
         }
     }
     
@@ -78,6 +93,7 @@ class ShadowingViewModel: ObservableObject {
     
     func play() {
         print("▶️ Play requested")
+        hasAutoPaused = false  // 플래그 초기화 - Play 버튼으로 재개 시
         isPlaying = true
     }
     
@@ -97,21 +113,55 @@ class ShadowingViewModel: ObservableObject {
     func seekToCurrentSentence() {
         guard let sentence = currentSentence else { return }
         print("⏩ Seeking to sentence: \(sentence.text) at \(sentence.startTime)s")
+        isManualSeeking = true
         currentTime = sentence.startTime
+        
+        // seek 완료 후 플래그 해제 (1초 후)
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            await MainActor.run {
+                self.isManualSeeking = false
+            }
+        }
     }
     
     /// 자막 클릭 시: seek + 자동 재생
     func seekAndPlay() {
         guard let sentence = currentSentence else { return }
         print("🎬 Seek and play: \(sentence.text) at \(sentence.startTime)s")
-        currentTime = sentence.startTime
-        isPlaying = true
+        isManualSeeking = true
+        hasAutoPaused = false  // 플래그 초기화
+        
+        // 같은 문장을 다시 클릭해도 재생되도록 처리
+        // 1. 먼저 일시정지
+        isPlaying = false
+        
+        // 2. seek 실행 (약간의 딜레이를 두어 확실하게 처리)
+        Task {
+            try? await Task.sleep(for: .milliseconds(100))
+            await MainActor.run {
+                self.currentTime = sentence.startTime
+            }
+            
+            // 3. 재생 시작
+            try? await Task.sleep(for: .milliseconds(100))
+            await MainActor.run {
+                self.isPlaying = true
+            }
+            
+            // 4. seek 플래그 해제
+            try? await Task.sleep(for: .milliseconds(500))
+            await MainActor.run {
+                self.isManualSeeking = false
+            }
+        }
     }
     
     func nextSentence() {
         if currentSentenceIndex < session.sentences.count - 1 {
             currentSentenceIndex += 1
             repeatCount = 0
+            hasAutoPaused = false  // 플래그 초기화
             seekToCurrentSentence()
         }
     }
@@ -120,6 +170,7 @@ class ShadowingViewModel: ObservableObject {
         if currentSentenceIndex > 0 {
             currentSentenceIndex -= 1
             repeatCount = 0
+            hasAutoPaused = false  // 플래그 초기화
             seekToCurrentSentence()
         }
     }
@@ -153,6 +204,7 @@ class ShadowingViewModel: ObservableObject {
         cancelLoop()
         
         isLooping = true
+        hasAutoPaused = false  // 플래그 초기화
         loopTask = Task {
             defer { 
                 Task { @MainActor in

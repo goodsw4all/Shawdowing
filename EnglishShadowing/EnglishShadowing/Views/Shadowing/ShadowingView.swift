@@ -236,7 +236,17 @@ struct ShadowingView: View {
                                 sentence: item.sentence,
                                 isCurrentlyPlaying: item.index == viewModel.currentSentenceIndex,
                                 onTap: {
+                                    print("🔍 Clicked sentence:")
+                                    print("   - Text: \(item.sentence.text)")
+                                    print("   - Index: \(item.index)")
+                                    print("   - Start time: \(item.sentence.startTime)")
+                                    print("   - Current index before: \(viewModel.currentSentenceIndex)")
+                                    
                                     viewModel.currentSentenceIndex = item.index
+                                    
+                                    print("   - Current index after: \(viewModel.currentSentenceIndex)")
+                                    print("   - Current sentence: \(viewModel.currentSentence?.text ?? "nil")")
+                                    
                                     viewModel.seekAndPlay()  // seek + 자동 재생
                                 },
                                 onFavorite: {

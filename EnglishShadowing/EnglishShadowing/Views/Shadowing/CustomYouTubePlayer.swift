@@ -158,7 +158,7 @@ struct CustomYouTubePlayer: View {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: player.currentItem,
             queue: .main
-        ) { _ in
+        ) { [self] _ in
             isPlaying = false
         }
     }
