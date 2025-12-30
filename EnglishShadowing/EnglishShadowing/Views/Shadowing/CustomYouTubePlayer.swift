@@ -4,25 +4,69 @@
 //
 //  Created by Myoungwoo Jang on 12/28/25.
 //
+//  역할: YouTube 비디오를 재생하는 커스텀 플레이어
+//  - YouTubeKit으로 비디오 스트림 URL 추출
+//  - AVPlayer로 네이티브 재생
+//  - ViewModel과 양방향 바인딩 (재생 상태, 시간, 속도)
+//
 
 import SwiftUI
 import AVKit
 import YouTubeKit
 import Combine
 
-/// YouTubeKit을 사용한 커스텀 YouTube 플레이어
-/// 직접 비디오 스트림을 다운로드하여 AVPlayer로 재생
+/// YouTube 비디오를 재생하는 커스텀 플레이어
+///
+/// **동작 원리**:
+/// 1. YouTubeKit으로 YouTube에서 비디오 스트림 URL 가져오기
+/// 2. AVPlayer로 해당 URL의 비디오 재생
+/// 3. ViewModel과 실시간 동기화 (시간, 재생 상태, 속도)
+///
+/// **주요 기능**:
+/// - YouTube 비디오 로딩 및 재생
+/// - 재생/일시정지 제어
+/// - Seek (시간 이동)
+/// - 재생 속도 조절 (0.5x ~ 2.0x)
+/// - 자동 시간 동기화 (0.1초마다)
+///
+/// **사용 예시**:
+/// ```swift
+/// CustomYouTubePlayer(
+///     videoID: "dQw4w9WgXcQ",
+///     currentTime: $viewModel.currentTime,
+///     isPlaying: $viewModel.isPlaying,
+///     playbackRate: $viewModel.playbackRate
+/// )
+/// ```
 struct CustomYouTubePlayer: View {
+    // MARK: - Properties
+    
+    /// YouTube 비디오 ID (예: "dQw4w9WgXcQ")
     let videoID: String
+    
+    /// 현재 재생 시간 (초) - ViewModel과 양방향 바인딩
     @Binding var currentTime: Double
+    
+    /// 재생 상태 (true: 재생, false: 일시정지) - ViewModel과 양방향 바인딩
     @Binding var isPlaying: Bool
+    
+    /// 재생 속도 배율 (1.0 = 정상, 0.5 = 느리게, 2.0 = 빠르게)
     @Binding var playbackRate: Double
     
+    /// 플레이어 관리 객체
     @StateObject private var playerManager = YouTubePlayerManager()
+    
+    /// AVPlayer 인스턴스 (비디오 재생 엔진)
     @State private var player: AVPlayer?
+    
+    /// 로딩 중 상태
     @State private var isLoading = true
+    
+    /// 에러 메시지 (로딩 실패 시)
     @State private var errorMessage: String?
-    @State private var isSeeking = false  // seek 무한루프 방지
+    
+    /// Seek 작업 중인지 (무한 루프 방지용)
+    @State private var isSeeking = false
     
     var body: some View {
         ZStack {

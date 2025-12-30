@@ -4,35 +4,140 @@
 //
 //  Created by Myoungwoo Jang on 12/28/25.
 //
+//  역할: 쉐도잉 화면의 비즈니스 로직을 담당하는 ViewModel
+//  - 비디오 재생 제어 (재생, 일시정지, 이동)
+//  - 문장별 학습 진행 상태 관리
+//  - 자동 일시정지 및 반복 재생 기능
+//  - 즐겨찾기 및 완료 표시 관리
+//
 
 import Foundation
 import Combine
 
+/// 쉐도잉 학습 화면의 상태와 동작을 관리하는 ViewModel
+///
+/// 이 클래스는 다음 기능을 제공합니다:
+/// - 비디오 재생 제어 (play, pause, seek)
+/// - 문장 단위 학습 진행 추적
+/// - 문장 끝에서 자동 일시정지
+/// - N회 반복 재생
+/// - 즐겨찾기 및 완료 상태 관리
 @MainActor
 class ShadowingViewModel: ObservableObject {
+    
+    // MARK: - Published Properties (View가 관찰하는 속성들)
+    
+    /// 현재 학습 중인 세션 정보
     @Published var session: ShadowingSession
+    
+    /// 현재 재생 중인 문장의 인덱스 (0부터 시작)
     @Published var currentSentenceIndex: Int = 0
+    
+    /// 비디오 재생 상태 (true: 재생 중, false: 일시정지)
     @Published var isPlaying: Bool = false
+    
+    /// 현재 비디오 재생 시간 (초 단위)
     @Published var currentTime: TimeInterval = 0
+    
+    /// 재생 속도 배율 (1.0 = 정상 속도, 0.5 = 느리게, 2.0 = 빠르게)
     @Published var playbackRate: Double = 1.0
+    
+    /// 현재 문장의 반복 재생 횟수 (루프 모드에서 사용)
     @Published var repeatCount: Int = 0
-    @Published var isLooping: Bool = false  // 반복 중인지 표시
     
-    private let playerSettings: PlayerSettings  // 전역 설정
+    /// 반복 재생 모드 활성화 여부
+    @Published var isLooping: Bool = false
+    
+    // MARK: - Private Properties (내부에서만 사용하는 속성들)
+    
+    /// 플레이어 전역 설정
+    private let playerSettings: PlayerSettings
+    
+    /// Combine 구독 관리를 위한 컬렉션
     private var cancellables = Set<AnyCancellable>()
-    private var loopTask: Task<Void, Never>?  // 반복 재생 Task
-    private var isManualSeeking: Bool = false  // 수동 seek 중인지 표시
-    private var hasAutoPaused: Bool = false  // 자동 일시정지 완료 플래그
     
+    /// 반복 재생을 위한 비동기 Task
+    private var loopTask: Task<Void, Never>?
+    
+    /// 수동 seek 작업 중인지 표시 (자동 동기화 방지용)
+    private var isManualSeeking: Bool = false
+    
+    /// 자동 일시정지가 실행되었는지 표시 (중복 실행 방지용)
+    private var hasAutoPaused: Bool = false
+    
+    // MARK: - Computed Properties (계산된 속성들)
+    
+    /// 현재 재생 중인 문장 객체
+    /// - Returns: 현재 인덱스의 문장, 범위를 벗어나면 nil
     var currentSentence: SentenceItem? {
         guard currentSentenceIndex < session.sentences.count else { return nil }
         return session.sentences[currentSentenceIndex]
     }
     
+    /// 마지막 문장인지 여부
     var isLastSentence: Bool {
         currentSentenceIndex >= session.sentences.count - 1
     }
     
+    /// 완료된 문장 개수
+    var completedCount: Int {
+        session.completedSentences.count
+    }
+    
+    /// 전체 문장 개수
+    var totalCount: Int {
+        session.sentences.count
+    }
+    
+    /// 학습 진행률 (백분율)
+    var progressPercentage: Int {
+        Int(session.progress * 100)
+    }
+    
+    // MARK: - Public Methods (View에서 호출하는 메서드들)
+    
+    /// 문장 목록을 필터링하여 반환
+    ///
+    /// - Parameters:
+    ///   - showFavoritesOnly: true면 즐겨찾기한 문장만 표시
+    ///   - hideCompleted: true면 완료한 문장 숨기기
+    /// - Returns: 필터링된 문장 배열 (인덱스와 문장 객체 포함)
+    ///
+    /// 사용 예시:
+    /// ```swift
+    /// let filtered = viewModel.filteredSentences(
+    ///     showFavoritesOnly: true,
+    ///     hideCompleted: false
+    /// )
+    /// ```
+    func filteredSentences(
+        showFavoritesOnly: Bool,
+        hideCompleted: Bool
+    ) -> [(index: Int, sentence: SentenceItem)] {
+        let indexed = Array(session.sentences.enumerated())
+        
+        return indexed.compactMap { (offset, element) -> (index: Int, sentence: SentenceItem)? in
+            // 즐겨찾기 필터 적용
+            if showFavoritesOnly && !element.isFavorite {
+                return nil
+            }
+            
+            // 완료 문장 필터 적용
+            if hideCompleted && element.isCompleted {
+                return nil
+            }
+            
+            // 필터를 통과한 문장 반환
+            return (index: offset, sentence: element)
+        }
+    }
+    
+    // MARK: - Initialization (초기화)
+    
+    /// ViewModel 초기화
+    /// - Parameters:
+    ///   - session: 학습할 세션 정보
+    ///   - playerSettings: 플레이어 설정
     init(session: ShadowingSession, playerSettings: PlayerSettings) {
         self.session = session
         self.playerSettings = playerSettings
@@ -88,20 +193,30 @@ class ShadowingViewModel: ObservableObject {
         }
     }
     
-    // 플레이어 컨트롤 메서드들은 이제 단순히 상태만 변경
-    // 실제 플레이어 제어는 CustomYouTubePlayer가 담당
+    // MARK: - Playback Controls (재생 제어)
     
+    /// 비디오 재생 시작
+    ///
+    /// Play 버튼을 눌렀을 때 호출됩니다.
+    /// 일시정지 상태를 해제하고 자동 일시정지 플래그를 초기화합니다.
     func play() {
         print("▶️ Play requested")
-        hasAutoPaused = false  // 플래그 초기화 - Play 버튼으로 재개 시
+        hasAutoPaused = false  // 플래그 초기화 - 문장 끝에서 다시 일시정지 가능하도록
         isPlaying = true
     }
     
+    /// 비디오 일시정지
+    ///
+    /// Pause 버튼을 눌렀을 때 호출됩니다.
     func pause() {
         print("⏸ Pause requested")
         isPlaying = false
     }
     
+    /// 재생/일시정지 토글
+    ///
+    /// Play/Pause 버튼을 눌렀을 때 호출됩니다.
+    /// 현재 상태에 따라 재생 또는 일시정지를 실행합니다.
     func togglePlayPause() {
         if isPlaying {
             pause()

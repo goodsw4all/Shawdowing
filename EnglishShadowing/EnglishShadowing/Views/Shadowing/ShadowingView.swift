@@ -4,15 +4,38 @@
 //
 //  Created by Myoungwoo Jang on 12/28/25.
 //
+//  역할: 쉐도잉 학습 화면의 UI를 구성하는 메인 View
+//  - YouTube 비디오 플레이어
+//  - 현재 문장 카드
+//  - 문장 목록 (필터링 가능)
+//  - 재생 컨트롤 패널
+//  - 프로소디 체크리스트
+//
 
 import SwiftUI
 
+/// 쉐도잉 학습 화면
+///
+/// 이 화면은 다음 요소들로 구성됩니다:
+/// - YouTube 비디오 플레이어
+/// - 현재 재생 중인 문장 정보 카드
+/// - 필터링 가능한 문장 목록
+/// - 재생 컨트롤 버튼들
+/// - 프로소디(발음) 체크리스트
 struct ShadowingView: View {
     @EnvironmentObject var navigationVM: NavigationViewModel
     @StateObject private var viewModel: ShadowingViewModel
+    
+    /// 즐겨찾기한 문장만 보기 토글
     @State private var showFavoritesOnly: Bool = false
+    
+    /// 완료한 문장 숨기기 토글
     @State private var hideCompleted: Bool = false
     
+    /// ViewModel 초기화
+    /// - Parameters:
+    ///   - session: 학습할 세션 정보
+    ///   - playerSettings: 플레이어 설정
     init(session: ShadowingSession, playerSettings: PlayerSettings) {
         _viewModel = StateObject(wrappedValue: ShadowingViewModel(
             session: session,
@@ -20,28 +43,20 @@ struct ShadowingView: View {
         ))
     }
     
-    // 필터링된 문장 리스트
+    /// 필터링된 문장 목록
+    ///
+    /// ViewModel의 filteredSentences 메서드를 호출하여
+    /// 현재 필터 설정에 맞는 문장들만 반환합니다.
     private var filteredSentences: [(index: Int, sentence: SentenceItem)] {
-        let indexed = Array(viewModel.session.sentences.enumerated())
-        
-        return indexed.compactMap { (offset, element) -> (index: Int, sentence: SentenceItem)? in
-            // 즐겨찾기 필터
-            if showFavoritesOnly && !element.isFavorite {
-                return nil
-            }
-            
-            // 완료된 문장 숨기기 필터
-            if hideCompleted && element.isCompleted {
-                return nil
-            }
-            
-            return (index: offset, sentence: element)
-        }
+        viewModel.filteredSentences(
+            showFavoritesOnly: showFavoritesOnly,
+            hideCompleted: hideCompleted
+        )
     }
     
     var body: some View {
         VStack(spacing: 0) {
-            // Custom YouTube Player
+            // YouTube 플레이어
             CustomYouTubePlayer(
                 videoID: viewModel.session.video.id,
                 currentTime: $viewModel.currentTime,

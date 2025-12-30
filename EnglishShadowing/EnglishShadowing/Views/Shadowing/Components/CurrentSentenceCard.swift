@@ -4,12 +4,37 @@
 //
 //  Created by GitHub Copilot on 12/30/25.
 //
+//  역할: 현재 재생 중인 문장 정보를 카드 형태로 표시
+//  - 문장 텍스트
+//  - 반복 횟수 인디케이터
+//  - 시작/종료 시간
+//
 
 import SwiftUI
 
+/// 현재 재생 중인 문장을 표시하는 카드 컴포넌트
+///
+/// 다음 정보를 표시합니다:
+/// - 문장 텍스트 (최대 3줄)
+/// - 반복 횟수 (원형 인디케이터)
+/// - 문장의 시작/종료 시간
+///
+/// 사용 예시:
+/// ```swift
+/// CurrentSentenceCard(
+///     sentence: currentSentence,
+///     repeatCount: 2,
+///     totalRepeats: 5
+/// )
+/// ```
 struct CurrentSentenceCard: View {
+    /// 표시할 문장 객체
     let sentence: SentenceItem
+    
+    /// 현재까지 반복한 횟수
     let repeatCount: Int
+    
+    /// 총 반복 예정 횟수
     let totalRepeats: Int
     
     var body: some View {
