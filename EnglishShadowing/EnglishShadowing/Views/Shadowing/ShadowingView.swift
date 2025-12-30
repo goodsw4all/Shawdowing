@@ -281,144 +281,27 @@ struct ShadowingView: View {
     }
 }
 
-struct CurrentSentenceCard: View {
-    let sentence: SentenceItem
-    let repeatCount: Int
-    let totalRepeats: Int
+#Preview {
+    let video = YouTubeVideo(id: "dQw4w9WgXcQ", title: "Sample Video")
+    let sentences = [
+        SentenceItem(text: "Hello, welcome to this video.", startTime: 0, endTime: 5),
+        SentenceItem(text: "This is a sample sentence.", startTime: 10, endTime: 15)
+    ]
+    let session = ShadowingSession(video: video, sentences: sentences)
+    let settings = PlayerSettings()
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("현재 문장")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-                Spacer()
-                
-                HStack(spacing: 4) {
-                    ForEach(0..<totalRepeats, id: \.self) { index in
-                        Circle()
-                            .fill(index < repeatCount ? Color.green : Color.gray.opacity(0.3))
-                            .frame(width: 8, height: 8)
-                    }
-                }
-            }
-            
-            Text(sentence.text)
-                .font(.title3)
-                .fontWeight(.medium)
-                .lineLimit(3)
-            
-            HStack {
-                Text(TimeFormatter.formatTime(sentence.startTime))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text("-")
-                    .foregroundStyle(.secondary)
-                Text(TimeFormatter.formatTime(sentence.endTime))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(nsColor: .controlBackgroundColor))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+    NavigationStack {
+        ShadowingView(session: session, playerSettings: settings)
     }
 }
 
-struct SentenceRow: View {
-    let sentence: SentenceItem
-    let isCurrentlyPlaying: Bool
-    let onTap: () -> Void
-    let onFavorite: () -> Void
-    let onLoop: (Int) -> Void  // 반복 횟수를 인자로 받음
-    
-    @State private var showLoopMenu = false
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Favorite button
-            Button(action: onFavorite) {
-                Image(systemName: sentence.isFavorite ? "star.fill" : "star")
-                    .foregroundStyle(sentence.isFavorite ? .yellow : .secondary)
-                    .font(.title3)
-            }
-            .buttonStyle(.plain)
-            
-            // Main content (clickable)
-            Button(action: onTap) {
-                HStack(spacing: 12) {
-                    Image(systemName: sentence.isCompleted ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(sentence.isCompleted ? .green : .secondary)
-                        .font(.title3)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(sentence.text)
-                            .font(.body)
-                            .lineLimit(2)
-                            .foregroundStyle(isCurrentlyPlaying ? .primary : .secondary)
-                        
-                        HStack {
-                            Text("\(TimeFormatter.formatTime(sentence.startTime)) - \(TimeFormatter.formatTime(sentence.endTime))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            
-                            if sentence.isFavorite {
-                                Text("⭐️")
-                                    .font(.caption2)
-                            }
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    if isCurrentlyPlaying {
-                        Image(systemName: "waveform")
-                            .foregroundStyle(.blue)
-                            .symbolEffect(.pulse)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-            
-            // Loop button with menu
-            Menu {
-                Button("1회 반복") {
-                    onLoop(1)
-                }
-                Button("3회 반복") {
-                    onLoop(3)
-                }
-                Button("5회 반복") {
-                    onLoop(5)
-                }
-                Button("10회 반복") {
-                    onLoop(10)
-                }
-            } label: {
-                Image(systemName: "repeat")
-                    .foregroundStyle(.secondary)
-            }
-            .menuStyle(.borderlessButton)
-            .frame(width: 30)
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 4)
-        .contentShape(Rectangle())
-        .background(isCurrentlyPlaying ? Color.blue.opacity(0.1) : Color.clear)
-        .cornerRadius(8)
-    }
-}
+// MARK: - TODO: 별도 파일로 분리 필요
 
 struct ControlPanelView: View {
     @ObservedObject var viewModel: ShadowingViewModel
-    @State private var showLoopOptions = false
     
     var body: some View {
         VStack(spacing: 16) {
-            // Playback Controls
             HStack(spacing: 24) {
                 Button(action: viewModel.previousSentence) {
                     Image(systemName: "backward.fill")
@@ -440,7 +323,6 @@ struct ControlPanelView: View {
                 Divider()
                     .frame(height: 30)
                 
-                // Loop menu or Cancel button
                 if viewModel.isLooping {
                     Button(action: viewModel.cancelLoop) {
                         HStack {
@@ -453,18 +335,10 @@ struct ControlPanelView: View {
                     .tint(.red)
                 } else {
                     Menu {
-                        Button("1회 반복") {
-                            viewModel.loopCurrentSentence(times: 1)
-                        }
-                        Button("3회 반복") {
-                            viewModel.loopCurrentSentence(times: 3)
-                        }
-                        Button("5회 반복") {
-                            viewModel.loopCurrentSentence(times: 5)
-                        }
-                        Button("10회 반복") {
-                            viewModel.loopCurrentSentence(times: 10)
-                        }
+                        Button("1회 반복") { viewModel.loopCurrentSentence(times: 1) }
+                        Button("3회 반복") { viewModel.loopCurrentSentence(times: 3) }
+                        Button("5회 반복") { viewModel.loopCurrentSentence(times: 5) }
+                        Button("10회 반복") { viewModel.loopCurrentSentence(times: 10) }
                     } label: {
                         Label("반복", systemImage: "repeat")
                     }
@@ -483,7 +357,6 @@ struct ControlPanelView: View {
                 .buttonStyle(.borderedProminent)
             }
             
-            // Playback Rate
             HStack {
                 Text("속도:")
                     .font(.subheadline)
@@ -496,11 +369,7 @@ struct ControlPanelView: View {
                             .font(.caption)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(
-                                viewModel.playbackRate == rate 
-                                    ? Color.accentColor 
-                                    : Color(nsColor: .controlBackgroundColor)
-                            )
+                            .background(viewModel.playbackRate == rate ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
                             .foregroundStyle(viewModel.playbackRate == rate ? .white : .primary)
                             .cornerRadius(6)
                     }
@@ -555,14 +424,10 @@ struct ProsodyChecklistView: View {
                         .background(
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(score.tintColor.opacity(0.5), lineWidth: 1)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(score.tintColor.opacity(0.08))
-                                )
+                                .background(RoundedRectangle(cornerRadius: 12).fill(score.tintColor.opacity(0.08)))
                         )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(metric.displayName) \(score.accessibilityLabel)")
                 }
             }
         }
@@ -582,14 +447,6 @@ private extension ProsodyScore {
         }
     }
     
-    var accessibilityLabel: String {
-        switch self {
-        case .notEvaluated: return "아직 평가하지 않음"
-        case .needsPractice: return "추가 연습 필요"
-        case .confident: return "확신 있음"
-        }
-    }
-    
     var tintColor: Color {
         switch self {
         case .notEvaluated: return .gray
@@ -603,46 +460,5 @@ private extension ProsodyScore {
         case .notEvaluated: return .primary
         default: return .white
         }
-    }
-}
-
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3:
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6:
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8:
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
-
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}
-
-#Preview {
-    let video = YouTubeVideo(id: "dQw4w9WgXcQ", title: "Sample Video")
-    let sentences = [
-        SentenceItem(text: "Hello, welcome to this video.", startTime: 0, endTime: 5),
-        SentenceItem(text: "This is a sample sentence.", startTime: 10, endTime: 15)
-    ]
-    let session = ShadowingSession(video: video, sentences: sentences)
-    let settings = PlayerSettings()
-    
-    NavigationStack {
-        ShadowingView(session: session, playerSettings: settings)
     }
 }
